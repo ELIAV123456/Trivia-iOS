@@ -288,4 +288,5 @@ class TriviaApp(App):
         return sm
 
 if __name__ == '__main__':
+
     TriviaApp().run()
