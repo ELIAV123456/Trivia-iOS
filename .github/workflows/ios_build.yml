@@ -1,4 +1,3 @@
-
 name: Build iOS
 on: [push, pull_request]
 
@@ -6,12 +5,12 @@ jobs:
   build:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
@@ -25,7 +24,7 @@ jobs:
           BUILDOZER_WARN_ON_ROOT: 1
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: iOS-Xcode-Project
-          path: .buildozer/ios/platform/kivy-ios/dist/hostpython3/../ # נתיב הפרויקט
+          path: .buildozer/ios/platform/kivy-ios/dist/hostpython3/../
