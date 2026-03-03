@@ -5,13 +5,14 @@ jobs:
   build:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
+          # הסרתי את שורת ה-cache שגרמה לשגיאה שראית
 
       - name: Install System Dependencies
         run: |
