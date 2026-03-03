@@ -1,5 +1,11 @@
 [app]
 
+# (bool) Whether to allow codesigning or not
+ios.codesign.allowed = false
+
+# (str) iOS codesigning identity (empty for now)
+ios.codesign.identity =
+
 # (str) Title of your application
 title = Trivia Quiz
 
