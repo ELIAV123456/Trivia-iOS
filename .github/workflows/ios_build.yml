@@ -7,10 +7,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # הוספתי כאן את packaging ו-setuptools שחסרים ל-kivy-ios
+          pip install kivy-ios buildozer Cython==0.29.33 packaging setuptools
 
       - name: Install System Dependencies (Homebrew)
         run: |
