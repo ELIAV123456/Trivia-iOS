@@ -5,30 +5,10 @@ package.domain = org.test
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json
 version = 0.1
-
-# Requirements - הגרסה המצומצמת לבדיקה
-requirements = python3==3.11,kivy==2.3.0,certifi
-
+requirements = python3,kivy==2.3.0,certifi
 orientation = portrait
-
-# iOS specific
 ios.codesign.allowed = false
-ios.codesign.identity =
+ios.codesign.identity = 
 ios.arch = arm64
-ios.sdk = 
+ios.sdk = 18.5
 ios.ios_deploy_target = 13.0
-ios.kivy_ios_url = https://github.com/kivy/kivy-ios
-ios.kivy_ios_branch = master
-
-# Android specific
-fullscreen = 0
-android.permissions = INTERNET, ACCESS_NETWORK_STATE
-android.api = 31
-android.minapi = 21
-android.enable_androidx = True
-android.archs = arm64-v8a, armeabi-v7a
-android.copy_libs = 1
-
-[buildozer]
-log_level = 2
-warn_on_root = 1
