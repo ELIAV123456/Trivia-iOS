@@ -7,7 +7,7 @@ source.include_exts = py,png,jpg,kv,atlas,json
 version = 0.1
 
 # Requirements - הגרסה המצומצמת לבדיקה
-requirements = python3,kivy==2.3.0,Cython==0.29.33,certifi,idna,charset-normalizer
+requirements = python3crystax==3.11,kivy==2.3.0,certifi
 
 orientation = portrait
 
