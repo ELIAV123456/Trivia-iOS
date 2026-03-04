@@ -25,7 +25,11 @@ jobs:
 
       - name: Create Xcode Project
         run: |
-          # יצירת הפרויקט (וודא ש-main.py נמצא בתיקייה הראשית)
+          # תיקון שגיאת ה-unicode בתוך הספרייה המותקנת
+          SITE_PACKAGES=$(python -c "import site; print(site.getsitepackages()[0])")
+          sed -i '' 's/unicode(bytes_to_check/str(bytes_to_check/g' "$SITE_PACKAGES/binaryornot/helpers.py" || true
+          
+          # עכשיו הרצת היצירה
           python -m kivy_ios.toolchain create "MyKivyApp" .
 
       - name: Compile App
