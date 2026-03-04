@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>טריוויה 2026</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon.png">
+
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+
+    <style>
+        body {
+            background-color: #1e1e2e;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        .card {
+            background-color: #2a2a3d;
+            padding: 20px;
+            border-radius: 20px;
+            width: 85%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px;
+            width: 100%;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+        input {
+            width: 90%;
+            padding: 12px;
+            border-radius: 10px;
+            border: none;
+            background: #3a3a4d;
+            color: white;
+            text-align: center;
+            font-size: 18px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card" id="game-container">
+        <h1 id="title">טעינה...</h1>
+        <div id="content">
+            <p>המשחק מתכונן, רק רגע...</p>
+        </div>
+    </div>
+
+    <script type="py">
+        from pyscript import display
+        import js
+
+        # כאן נכנסת הלוגיקה מה-main.py שלך בתרגום קל לווב
+        def start_game(event=None):
+            container = js.document.getElementById("content")
+            container.innerHTML = """
+                <p id='question'>טוען שאלה...</p>
+                <input type='text' id='answer' placeholder='התשובה שלך...'>
+                <button id='submit-btn'>בדוק תשובה</button>
+            """
+            js.document.getElementById("title").innerText = "שאלה 1"
+
+        # הפעלה ראשונית
+        js.document.getElementById("title").innerText = "🎮 Trivia Game"
+        js.document.getElementById("content").innerHTML = '<button id="start-btn">התחל משחק</button>'
+        
+        # חיבור כפתור ההתחלה
+        start_btn = js.document.getElementById("start-btn")
+        start_btn.onclick = start_game
+    </script>
+
+</body>
+</html>
