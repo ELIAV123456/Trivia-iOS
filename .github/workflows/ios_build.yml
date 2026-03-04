@@ -22,22 +22,25 @@ jobs:
 
       - name: Full Build and Create
         run: |
-          # 1. מנקים שאריות אם היו
-          python -m kivy_ios.toolchain clean python3 kivy || true
+          # 1. בנייה מפורשת של פייתון קודם כל
+          python -m kivy_ios.toolchain build python3
           
-          # 2. בונים מחדש את המתכונים (כאן זה ייקח זמן)
-          python -m kivy_ios.toolchain build python3 kivy
+          # 2. בנייה של Kivy (זה אמור להיות מהיר יותר עכשיו)
+          python -m kivy_ios.toolchain build kivy
           
-          # 3. יצירת הפרויקט בתוך תיקייה נקייה לגמרי
+          # 3. הדפסת רשימת המתכונים המוכנים (ליתר ביטחון, כדי שנראה ב-Log)
+          python -m kivy_ios.toolchain recipes
+          
+          # 4. יצירת תיקייה נקייה לגמרי בנתיב מוחלט
           mkdir -p /tmp/empty_app
           echo "import kivy" > /tmp/empty_app/main.py
-          mkdir -p output
-          cd output
+          
+          # 5. יצירת הפרויקט (שיניתי את הנתיב לתיקייה הנוכחית ללא 'output' כדי למנוע בלבול)
           python -m kivy_ios.toolchain create "MyKivyApp" /tmp/empty_app
           
-          # 4. העתקת הקוד שלך פנימה
-          cd ..
-          cp -R ./*.py output/mykivyapp-ios/mykivyapp/
+          # 6. העתקת הקוד שלך פנימה
+          cp -R ./*.py mykivyapp-ios/mykivyapp/
+          
 
       - name: Final Xcode Build
         run: |
