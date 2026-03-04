@@ -3,82 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Trivia Quiz 2026</title>
-    
+    <title>טריוויה 2026 - המלא</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
+    
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
 
     <style>
-        body {
-            background-color: #1e1e2e;
-            color: white;
-            font-family: -apple-system, system-ui, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            text-align: center;
-            overflow: hidden;
-        }
-        .card {
-            background-color: #2a2a3d;
-            padding: 30px;
-            border-radius: 25px;
-            width: 85%;
-            max-width: 450px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
-        }
-        h1 { color: #2196F3; font-size: 28px; margin-bottom: 20px; }
-        .question-text { font-size: 22px; margin-bottom: 25px; min-height: 60px; font-weight: bold; }
-        input {
-            width: 90%;
-            padding: 15px;
-            border-radius: 12px;
-            border: none;
-            background: #3a3a4d;
-            color: white;
-            font-size: 18px;
-            margin-bottom: 15px;
-            text-align: center;
-            outline: none;
-        }
-        input:focus { border: 2px solid #2196F3; }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            padding: 16px;
-            width: 100%;
-            border-radius: 12px;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        button:active { transform: scale(0.95); opacity: 0.8; }
-        .feedback { margin-top: 15px; font-weight: bold; height: 24px; font-size: 18px; }
+        :root { --bg: #1e1e2e; --card: #2a2a3d; --accent: #2196F3; --green: #4CAF50; }
+        body { background-color: var(--bg); color: white; font-family: -apple-system, sans-serif; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        .container { background: var(--card); padding: 25px; border-radius: 25px; width: 85%; max-width: 450px; box-shadow: 0 15px 35px rgba(0,0,0,0.5); text-align: center; }
+        .screen { display: none; }
+        .active { display: block; }
+        h1 { color: var(--accent); margin-bottom: 20px; }
+        input { width: 90%; padding: 15px; margin: 10px 0; border-radius: 12px; border: none; background: #3a3a4d; color: white; text-align: center; font-size: 18px; }
+        button { width: 100%; padding: 16px; margin: 10px 0; border-radius: 12px; border: none; background: var(--green); color: white; font-size: 18px; font-weight: bold; cursor: pointer; }
+        button.secondary { background: #555; }
+        .leaderboard-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #444; }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <h1 id="header">🎮 Trivia Quiz</h1>
-        
-        <div id="game-ui" style="display: none;">
-            <div class="question-text" id="q-text">טוען שאלה...</div>
-            <input type="text" id="ans-input" placeholder="הקלד תשובה כאן..." autocomplete="off">
-            <button id="check-btn">בדוק תשובה</button>
-            <div class="feedback" id="feedback"></div>
+    <div class="container">
+        <div id="login-screen" class="screen active">
+            <h1>כניסה למשחק</h1>
+            <input type="text" id="username" placeholder="שם משתמש">
+            <button id="login-btn">היכנס / הרשם</button>
         </div>
 
-        <div id="start-ui">
-            <p>מוכנים להתחיל בטריוויה?</p>
-            <button id="start-btn">התחל משחק</button>
+        <div id="menu-screen" class="screen">
+            <h1 id="welcome-msg">שלום!</h1>
+            <button id="go-game-btn">התחל משחק</button>
+            <button id="go-leaderboard-btn" class="secondary">לוח תוצאות</button>
+        </div>
+
+        <div id="game-screen" class="screen">
+            <h2 id="q-header">שאלה</h2>
+            <div id="q-text" style="font-size: 20px; margin: 20px 0;">טוען...</div>
+            <input type="text" id="game-input" placeholder="תשובה...">
+            <button id="submit-ans-btn">שלח תשובה</button>
+            <div id="game-feedback" style="height: 20px; margin-top: 10px;"></div>
+        </div>
+
+        <div id="leaderboard-screen" class="screen">
+            <h1>🏆 מובילים</h1>
+            <div id="leaderboard-list"></div>
+            <button id="back-to-menu-btn" class="secondary">חזרה</button>
         </div>
     </div>
 
@@ -86,75 +57,83 @@
         import js
         from pyodide.http import pyfetch
         from pyodide.ffi import create_proxy
-        import random
+        import json, random
 
-        DB_URL = "https://triviaquizapp-8b15c-default-rtdb.firebaseio.com/questions.json"
+        BASE_URL = "https://triviaquizapp-8b15c-default-rtdb.firebaseio.com/"
+        user_name = ""
         questions = []
-        current_idx = 0
+        cur_idx = 0
         score = 0
 
-        async def fetch_questions():
-            global questions
-            try:
-                response = await pyfetch(DB_URL)
-                data = await response.json()
-                
-                # תמיכה גם במבנה רשימה וגם במבנה דיקשנרי (Firebase)
-                if isinstance(data, dict):
-                    raw_list = list(data.values())
-                else:
-                    raw_list = data
-                
-                # סינון נתונים ריקים
-                questions = [v for v in raw_list if v and isinstance(v, dict) and 'q' in v]
-                random.shuffle(questions)
-                questions = questions[:10]
-                
-            except Exception as e:
-                js.console.log(f"Error fetching: {str(e)}")
-                js.document.getElementById("q-text").innerText = "שגיאה בחיבור ל-Firebase"
+        def switch_screen(screen_id):
+            for s in js.document.querySelectorAll(".screen"): s.classList.remove("active")
+            js.document.getElementById(screen_id).classList.add("active")
+
+        async def login(event):
+            global user_name
+            name = js.document.getElementById("username").value.strip()
+            if not name: return
+            user_name = name
+            js.document.getElementById("welcome-msg").innerText = f"שלום, {name}!"
+            switch_screen("menu-screen")
 
         async def start_game(event):
-            js.document.getElementById("start-ui").style.display = "none"
-            js.document.getElementById("game-ui").style.display = "block"
-            js.document.getElementById("q-text").innerText = "טוען שאלות..."
-            await fetch_questions()
-            show_question()
+            global questions, cur_idx, score
+            cur_idx = 0
+            score = 0
+            res = await pyfetch(f"{BASE_URL}questions.json")
+            data = await res.json()
+            questions = [v for v in data if v and 'q' in v]
+            random.shuffle(questions)
+            questions = questions[:10]
+            switch_screen("game-screen")
+            show_q()
 
-        def show_question():
-            global current_idx
-            if current_idx < len(questions):
-                q = questions[current_idx]
-                js.document.getElementById("q-text").innerText = q['q']
-                js.document.getElementById("ans-input").value = ""
-                js.document.getElementById("feedback").innerText = ""
-                js.document.getElementById("header").innerText = f"שאלה {current_idx + 1}/10"
+        def show_q():
+            if cur_idx < len(questions):
+                js.document.getElementById("q-header").innerText = f"שאלה {cur_idx+1}/10"
+                js.document.getElementById("q-text").innerText = questions[cur_idx]['q']
+                js.document.getElementById("game-input").value = ""
+                js.document.getElementById("game-feedback").innerText = ""
             else:
-                final_text = f"<h2>סיימת! 🏆</h2><p>הניקוד שלך: {score}/10</p>"
-                js.document.getElementById("game-ui").innerHTML = final_text + "<button onclick='location.reload()'>שחק שוב</button>"
+                finish_game()
 
-        def check_answer(event):
-            global current_idx, score
-            user_ans = js.document.getElementById("ans-input").value.strip().lower()
-            correct_ans = str(questions[current_idx]['a']).lower()
-            
-            feedback_el = js.document.getElementById("feedback")
-            
-            if user_ans == correct_ans:
+        async def finish_game():
+            # שמירת תוצאה ל-Firebase
+            points_data = {"points": score}
+            await pyfetch(f"{BASE_URL}users/{user_name}.json", method="PATCH", body=json.dumps(points_data))
+            js.alert(f"סיימת! הניקוד: {score}")
+            switch_screen("menu-screen")
+
+        def check_ans(event):
+            global cur_idx, score
+            ans = js.document.getElementById("game-input").value.strip().lower()
+            correct = str(questions[cur_idx]['a']).lower()
+            if ans == correct:
                 score += 1
-                feedback_el.innerText = "✅ נכון מאוד!"
-                feedback_el.style.color = "#4CAF50"
+                js.document.getElementById("game-feedback").innerText = "✅ נכון!"
             else:
-                feedback_el.innerText = f"❌ טעות. התשובה: {correct_ans}"
-                feedback_el.style.color = "#ff5555"
-            
-            current_idx += 1
-            # מעבר שאלה אחרי השהיה קלה
-            js.setTimeout(create_proxy(show_question), 2000)
+                js.document.getElementById("game-feedback").innerText = f"❌ טעות: {correct}"
+            cur_idx += 1
+            js.setTimeout(create_proxy(show_q), 1500)
 
-        # רישום אירועים לכפתורים
-        js.document.getElementById("start-btn").onclick = create_proxy(start_game)
-        js.document.getElementById("check-btn").onclick = create_proxy(check_answer)
+        async def show_leaderboard(event):
+            switch_screen("leaderboard-screen")
+            res = await pyfetch(f"{BASE_URL}users.json")
+            users = await res.json()
+            sorted_users = sorted(users.items(), key=lambda x: x[1].get('points', 0) if isinstance(x[1], dict) else 0, reverse=True)
+            html = ""
+            for i, (name, data) in enumerate(sorted_users[:5], 1):
+                pts = data.get('points', 0) if isinstance(data, dict) else 0
+                html += f"<div class='leaderboard-item'><span>{i}. {name}</span><span>{pts} נק'</span></div>"
+            js.document.getElementById("leaderboard-list").innerHTML = html
+
+        # חיבור כפתורים
+        js.document.getElementById("login-btn").onclick = create_proxy(login)
+        js.document.getElementById("go-game-btn").onclick = create_proxy(start_game)
+        js.document.getElementById("submit-ans-btn").onclick = create_proxy(check_ans)
+        js.document.getElementById("go-leaderboard-btn").onclick = create_proxy(show_leaderboard)
+        js.document.getElementById("back-to-menu-btn").onclick = create_proxy(lambda x: switch_screen("menu-screen"))
     </script>
 </body>
 </html>
