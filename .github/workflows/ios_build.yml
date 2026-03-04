@@ -24,16 +24,21 @@ jobs:
           # הרצת ה-toolchain כמודול פייתון כדי לעקוף בעיות נתיבים
           python -m kivy_ios.toolchain build python3 kivy
 
-      - name: Create Xcode Project
+      - name: Create Xcode Project (Safe Mode)
         run: |
-          # ביטול הבדיקה הבינארית שגורמת לקריסה - הגדרת משתנה סביבה שיעקוף את הבעיה
-          export PYTHONIOENCODING=utf-8
-          export LANG=en_US.UTF-8
+          # 1. יוצרים תיקייה ריקה כדי ש-toolchain לא יתרסק על קבצים קיימים
+          mkdir empty_dir
+          touch empty_dir/main.py
           
-          # הרצת היצירה עם השם של האפליקציה שלך
-          python -m kivy_ios.toolchain create "MyKivyApp" .
+          # 2. יוצרים את פרויקט ה-Xcode מהתיקייה הריקה
+          python -m kivy_ios.toolchain create "MyKivyApp" empty_dir
+          
+          # 3. עכשיו מעתיקים את הקוד האמיתי שלך לתוך הפרויקט שנוצר
+          # הנתיב הוא בדרך כלל mykivyapp-ios/YourApp
+          cp -R ./*.py mykivyapp-ios/mykivyapp/
+          # אם יש לך תמונות או פונטים, העתק גם אותם:
+          # cp -R ./assets mykivyapp-ios/mykivyapp/ || true
 
-          
       - name: Compile App
         run: |
           cd mykivyapp-ios
@@ -44,7 +49,8 @@ jobs:
             -sdk iphoneos \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
 
       - name: Upload Build
         uses: actions/upload-artifact@v4 # התיקון הקריטי כאן - v4
