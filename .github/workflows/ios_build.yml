@@ -44,17 +44,21 @@ jobs:
 
       - name: Full Build and Create
         run: |
-          # 1. בנייה
+          # 1. בנייה (במידה וצריך)
           python -m kivy_ios.toolchain build python3 kivy
           
-          # 2. יצירת תיקייה זמנית למניעת שגיאת unicode
+          # 2. מחיקת תיקיות ישנות כדי למנוע את שגיאת ה-OutputDirExistsException
+          rm -rf mykivyapp-ios
+          rm -rf /tmp/empty_app
+          
+          # 3. יצירת תיקייה זמנית נקייה
           mkdir -p /tmp/empty_app
           echo "import kivy" > /tmp/empty_app/main.py
           
-          # 3. יצירת הפרויקט בתיקייה הראשית
+          # 4. יצירת הפרויקט מחדש
           python -m kivy_ios.toolchain create "MyKivyApp" /tmp/empty_app
           
-          # 4. העתקת הקוד שלך פנימה (הנתיב תוקן)
+          # 5. העתקת הקוד שלך פנימה
           cp -R ./*.py mykivyapp-ios/mykivyapp/
 
       - name: Final Xcode Build
