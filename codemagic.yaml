@@ -1,23 +1,19 @@
 workflows:
-  ios-workflow:
-    name: iOS Build
-    max_build_duration: 60
+  ios-native-workflow:
+    name: iOS Native Build
     instance_type: mac_mini_m1
-    integrations:
-      app_store_connect: <your_integration_name> # אפשר למחוק אם אין לך חיבור רשמי
+    max_build_duration: 60
     scripts:
-      - name: Install dependencies
-        script: | 
-          # אם זה פלאטר, שים פה flutter packages get
-          # אם זה ריאקט נייטיב, שים פה npm install
-          echo "Installing dependencies..."
-      - name: Build iOS
-        script: | 
-          # הפקודה שבונה את האפליקציה (למשל flutter build ios --release --no-codesign)
-          echo "Building..."
+      - name: Build and Package
+        script: |
+          # כאן אנחנו בונים את האפליקציה ללא חתימה דיגיטלית (כי אנחנו בגרסה החינמית)
+          xcodebuild build \
+            -workspace *.xcworkspace \
+            -scheme YourProjectName \
+            -configuration Release \
+            -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
     artifacts:
-      - build/ios/ipa/*.ipa
-    publishing:
-      email:
-        recipients:
-          - your-email@example.com # שים פה את המייל שלך
+      - build/Release-iphoneos/*.app
