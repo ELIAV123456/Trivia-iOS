@@ -7,15 +7,15 @@ source.include_exts = py,png,jpg,kv,atlas,json
 version = 0.1
 
 # Requirements - הגרסה המצומצמת לבדיקה
-requirements = python3crystax==3.11,kivy==2.3.0,certifi
+requirements = python3==3.11,kivy==2.3.0,certifi
 
 orientation = portrait
 
 # iOS specific
 ios.codesign.allowed = false
-ios.codesign.identity = 
+ios.codesign.identity =
 ios.arch = arm64
-ios.sdk = 18.5
+ios.sdk = 
 ios.ios_deploy_target = 13.0
 ios.kivy_ios_url = https://github.com/kivy/kivy-ios
 ios.kivy_ios_branch = master
