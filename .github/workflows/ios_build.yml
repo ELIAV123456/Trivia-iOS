@@ -5,39 +5,41 @@ jobs:
   build:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4  # עודכן ל-v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5 # עודכן ל-v5
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Install Kivy-ios and Dependencies
+      - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          # התקנת הספריות ועדכון הספרייה הבעייתית לגרסה שתומכת בפייתון 3 טוב יותר
-          pip install "Cython<3.0" kivy-ios binaryornot cookiecutter
+          # התקנת גרסאות ספציפיות כדי למנוע את שגיאת ה-urllib3 וה-Requests
+          pip install "urllib3<2" "chardet<5" "requests<2.30"
+          pip install "Cython<3.0" kivy-ios
           brew install autoconf automake libtool pkg-config
 
-      - name: Build and Create Project
+      - name: Full Build and Create
         run: |
-          # 1. בניית המתכונים (זה השלב הארוך)
+          # 1. מנקים שאריות אם היו
+          python -m kivy_ios.toolchain clean python3 kivy || true
+          
+          # 2. בונים מחדש את המתכונים (כאן זה ייקח זמן)
           python -m kivy_ios.toolchain build python3 kivy
           
-          # 2. יצירת תיקייה נקייה להרצה בטוחה (המעקף מהשלב הקודם)
+          # 3. יצירת הפרויקט בתוך תיקייה נקייה לגמרי
           mkdir -p /tmp/empty_app
           echo "import kivy" > /tmp/empty_app/main.py
-          
-          # 3. יצירת הפרויקט
           mkdir -p output
           cd output
           python -m kivy_ios.toolchain create "MyKivyApp" /tmp/empty_app
           
-          # 4. העתקת הקוד שלך לתוך הפרויקט
+          # 4. העתקת הקוד שלך פנימה
           cd ..
           cp -R ./*.py output/mykivyapp-ios/mykivyapp/
 
-      - name: Compile Xcode
+      - name: Final Xcode Build
         run: |
           cd output/mykivyapp-ios
           xcodebuild build \
@@ -46,8 +48,7 @@ jobs:
             -configuration Release \
             -sdk iphoneos \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+            CODE_SIGNING_REQUIRED=NO
             
       - name: Upload Build
         uses: actions/upload-artifact@v4 # התיקון הקריטי כאן - v4
