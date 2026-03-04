@@ -1,6 +1,6 @@
 [app]
 title = TriviaQuizApp
-package.name = myapp
+package.name = MyApp
 package.domain = org.test
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json
@@ -17,6 +17,8 @@ ios.codesign.identity =
 ios.arch = arm64
 ios.sdk = 18.5
 ios.ios_deploy_target = 13.0
+ios.kivy_ios_url = https://github.com/kivy/kivy-ios
+ios.kivy_ios_branch = master
 
 # Android specific
 fullscreen = 0
