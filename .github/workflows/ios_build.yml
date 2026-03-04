@@ -25,9 +25,12 @@ jobs:
 
       - name: Build with Buildozer
         run: |
+          pip install Cython==0.29.33
           buildozer ios debug
         env:
           BUILDOZER_WARN_ON_ROOT: 1
+          # הוספת פקודה שמוודאת ש-Xcode מוכן
+          DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
