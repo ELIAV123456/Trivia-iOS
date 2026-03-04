@@ -15,7 +15,8 @@ jobs:
       - name: Install System Dependencies
         run: |
           brew install autoconf automake libtool pkg-config cmake
-          pip install Cython==0.29.33 buildozer kivy-ios
+          # הוספנו כאן את packaging
+          pip install Cython==0.29.33 buildozer kivy-ios packaging
 
       - name: Build with Buildozer
         run: |
