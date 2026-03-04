@@ -20,11 +20,26 @@ jobs:
 
       - name: Build with Buildozer
         run: |
+          # ניקוי הורדות קודמות שאולי נכשלו
+          rm -rf .buildozer/ios/cache
+          # הרצה עם לוג מפורט כדי לראות איזה קובץ בדיוק נכשל בהורדה
+          buildozer -v ios debug
+          
+      - name: Build with Buildozer
+        run: |
           # הפקודה הזו כבר מריצה את ה-toolchain בפנים
           # אנחנו מוסיפים --verbose כדי לראות בדיוק איפה זה נתקע אם תהיה בעיה
           yes | buildozer --verbose ios debug
         env:
           BUFFER_SIZE: 1024
+
+      - name: Cache Buildozer vars
+        uses: actions/cache@v4
+        with:
+          path: .buildozer
+          key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
+          restore-keys: |
+            ${{ runner.os }}-buildozer-
 
       - name: Verify and List Xcode Project
         run: |
