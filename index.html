@@ -236,16 +236,29 @@
             idx += 1
             js.setTimeout(create_proxy(next_q), 1500)
 
-        async def save_and_exit():
+       async def save_and_exit(e=None):  # הוספנו e=None כדי שיוכל לקבל את אירוע הלחיצה
             global score, timer_event
-            if timer_event: js.clearInterval(timer_event)
+            if timer_event: 
+                js.clearInterval(timer_event)
+            
             u = js.localStorage.getItem("user")
             if u and score > 0:
-                res = await pyfetch(f"{DB_URL}users/{u}.json")
-                udata = await res.json()
-                old_pts = float(udata.get('points', 0)) if udata else 0
-                await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": old_pts + score}))
-            js.alert(f"המשחק נגמר! ניקוד: {score}")
+                try:
+                    res = await pyfetch(f"{DB_URL}users/{u}.json")
+                    udata = await res.json()
+                    # בדיקה אם udata קיים ואם הוא מילון
+                    if udata and isinstance(udata, dict):
+                        old_pts = float(udata.get('points', 0))
+                    else:
+                        old_pts = 0.0
+                        
+                    await pyfetch(f"{DB_URL}users/{u}.json", 
+                                  method="PATCH", 
+                                  body=json.dumps({"points": old_pts + score}))
+                except Exception as ex:
+                    js.console.log(f"Error saving score: {str(ex)}")
+            
+            js.alert(f"המשחק נגמר! ניקוד: {int(score)}")
             switch_screen("menu-screen")
 
         # --- לוגיקת התחברות ---
