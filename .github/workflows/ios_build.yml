@@ -15,19 +15,27 @@ jobs:
       - name: Install System Dependencies
         run: |
           brew install autoconf automake libtool pkg-config cmake
-          # הוספנו כאן את packaging
-          pip install Cython==0.29.33 buildozer kivy-ios packaging
+          # packaging חייב להיות כאן כדי למנוע את השגיאה הקודמת
+          pip install Cython==0.29.33 buildozer kivy-ios packaging 
 
-      - name: Build with Buildozer
+      - name: Run Buildozer
         run: |
-          # פקודה זו עונה "yes" לכל השאלות של Buildozer באופן אוטומטי
+          # הפקודה הזו מכינה את פרויקט ה-Xcode
           yes | buildozer ios debug
         env:
-          # זה מונע קריסות של זיכרון בשרת
           BUFFER_SIZE: 1024
+
+      - name: Build Xcode project
+        run: |
+          # כאן אנחנו נכנסים לתיקייה שנוצרה ובונים את הקובץ הסופי
+          # אנחנו משתמשים ב-target "myapp" כי זה מה שמוגדר ב-buildozer.spec
+          cd .buildozer/ios/platform/kivy-ios/dist/hostpython3/../..
+          # פקודה זו סורקת את התיקייה כדי למצוא את פרויקט ה-Xcode ובנייה שלו
+          xcodebuild -project *.xcodeproj -scheme myapp -configuration Debug -sdk iphoneos CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: iOS-Xcode-Project
-          path: .buildozer/ios/platform/kivy-ios/  # הנתיב לפרויקט ה-Xcode
+          name: iOS-App-Project
+          # אנחנו מעלים את כל תיקיית ה-dist כדי שיהיה לנו את הפרויקט המוכן
+          path: .buildozer/ios/platform/kivy-ios/dist/
