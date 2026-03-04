@@ -63,22 +63,29 @@ jobs:
 
       - name: Final Xcode Build
         run: |
-          # כאן היה התיקון - אנחנו נכנסים ישירות לתיקייה שנוצרה בראשית המאגר
           cd mykivyapp-ios
+          # הרצת הבנייה עם הגדרה מפורשת של תיקיית הפלט
           xcodebuild build \
             -project mykivyapp.xcodeproj \
             -scheme mykivyapp \
             -configuration Release \
             -sdk iphoneos \
+            -derivedDataPath build_output \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=""
-            
+
+      - name: List files (For Debugging)
+        run: |
+          # פקודה שעוזרת לנו לראות איפה הקובץ באמת נמצא אם הוא לא בנתיב הרגיל
+          find . -name "*.app"
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ios-app
-          path: mykivyapp-ios/build/Release-iphoneos/*.app
+          # החלפנו לנתיב החדש שהגדרנו ב-derivedDataPath
+          path: mykivyapp-ios/build_output/Build/Products/Release-iphoneos/*.app
             
       - name: Upload Build
         uses: actions/upload-artifact@v4 # התיקון הקריטי כאן - v4
