@@ -23,6 +23,7 @@
             height: 100vh;
             margin: 0;
             text-align: center;
+            overflow: hidden;
         }
         .card {
             background-color: #2a2a3d;
@@ -33,7 +34,7 @@
             box-shadow: 0 15px 35px rgba(0,0,0,0.6);
         }
         h1 { color: #2196F3; font-size: 28px; margin-bottom: 20px; }
-        .question-text { font-size: 22px; margin-bottom: 25px; min-height: 60px; }
+        .question-text { font-size: 22px; margin-bottom: 25px; min-height: 60px; font-weight: bold; }
         input {
             width: 90%;
             padding: 15px;
@@ -44,7 +45,9 @@
             font-size: 18px;
             margin-bottom: 15px;
             text-align: center;
+            outline: none;
         }
+        input:focus { border: 2px solid #2196F3; }
         button {
             background-color: #4CAF50;
             color: white;
@@ -57,30 +60,32 @@
             cursor: pointer;
             transition: 0.2s;
         }
-        button:active { transform: scale(0.98); opacity: 0.8; }
-        .feedback { margin-top: 15px; font-weight: bold; height: 20px; }
+        button:active { transform: scale(0.95); opacity: 0.8; }
+        .feedback { margin-top: 15px; font-weight: bold; height: 24px; font-size: 18px; }
     </style>
 </head>
 <body>
 
     <div class="card">
         <h1 id="header">🎮 Trivia Quiz</h1>
+        
         <div id="game-ui" style="display: none;">
             <div class="question-text" id="q-text">טוען שאלה...</div>
-            <input type="text" id="ans-input" placeholder="הקלד תשובה כאן...">
+            <input type="text" id="ans-input" placeholder="הקלד תשובה כאן..." autocomplete="off">
             <button id="check-btn">בדוק תשובה</button>
             <div class="feedback" id="feedback"></div>
         </div>
+
         <div id="start-ui">
-            <p>מוכנים להתחיל?</p>
+            <p>מוכנים להתחיל בטריוויה?</p>
             <button id="start-btn">התחל משחק</button>
         </div>
     </div>
 
     <script type="py">
         import js
-        import json
         from pyodide.http import pyfetch
+        from pyodide.ffi import create_proxy
         import random
 
         DB_URL = "https://triviaquizapp-8b15c-default-rtdb.firebaseio.com/questions.json"
@@ -93,17 +98,26 @@
             try:
                 response = await pyfetch(DB_URL)
                 data = await response.json()
-                # סינון וניקוי נתונים מה-Firebase
-                questions = [v for v in data if v and 'q' in v]
+                
+                # תמיכה גם במבנה רשימה וגם במבנה דיקשנרי (Firebase)
+                if isinstance(data, dict):
+                    raw_list = list(data.values())
+                else:
+                    raw_list = data
+                
+                # סינון נתונים ריקים
+                questions = [v for v in raw_list if v and isinstance(v, dict) and 'q' in v]
                 random.shuffle(questions)
                 questions = questions[:10]
+                
             except Exception as e:
-                js.console.log(f"Error: {e}")
-                js.document.getElementById("q-text").innerText = "שגיאה בחיבור לשרת"
+                js.console.log(f"Error fetching: {str(e)}")
+                js.document.getElementById("q-text").innerText = "שגיאה בחיבור ל-Firebase"
 
         async def start_game(event):
             js.document.getElementById("start-ui").style.display = "none"
             js.document.getElementById("game-ui").style.display = "block"
+            js.document.getElementById("q-text").innerText = "טוען שאלות..."
             await fetch_questions()
             show_question()
 
@@ -116,30 +130,31 @@
                 js.document.getElementById("feedback").innerText = ""
                 js.document.getElementById("header").innerText = f"שאלה {current_idx + 1}/10"
             else:
-                js.document.getElementById("game-ui").innerHTML = f"<h2>סיימת!</h2><p>הניקוד שלך: {score}/10</p><button onclick='location.reload()'>שחק שוב</button>"
+                final_text = f"<h2>סיימת! 🏆</h2><p>הניקוד שלך: {score}/10</p>"
+                js.document.getElementById("game-ui").innerHTML = final_text + "<button onclick='location.reload()'>שחק שוב</button>"
 
         def check_answer(event):
             global current_idx, score
             user_ans = js.document.getElementById("ans-input").value.strip().lower()
             correct_ans = str(questions[current_idx]['a']).lower()
             
-            feedback = js.document.getElementById("feedback")
+            feedback_el = js.document.getElementById("feedback")
+            
             if user_ans == correct_ans:
                 score += 1
-                feedback.innerText = "✅ נכון מאוד!"
-                feedback.style.color = "#4CAF50"
+                feedback_el.innerText = "✅ נכון מאוד!"
+                feedback_el.style.color = "#4CAF50"
             else:
-                feedback.innerText = f"❌ טעות. התשובה היא: {correct_ans}"
-                feedback.style.color = "#ff5555"
+                feedback_el.innerText = f"❌ טעות. התשובה: {correct_ans}"
+                feedback_el.style.color = "#ff5555"
             
             current_idx += 1
-            # מחכה 2 שניות ועובר לשאלה הבאה
-            js.setTimeout(js.create_proxy(show_question), 2000)
+            # מעבר שאלה אחרי השהיה קלה
+            js.setTimeout(create_proxy(show_question), 2000)
 
-        # חיבור כפתורים לפונקציות
-        js.document.getElementById("start-btn").onclick = js.create_proxy(start_game)
-        js.document.getElementById("check-btn").onclick = js.create_proxy(check_answer)
+        # רישום אירועים לכפתורים
+        js.document.getElementById("start-btn").onclick = create_proxy(start_game)
+        js.document.getElementById("check-btn").onclick = create_proxy(check_answer)
     </script>
-
 </body>
 </html>
