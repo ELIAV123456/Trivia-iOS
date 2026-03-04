@@ -42,16 +42,39 @@ jobs:
           cp -R ./*.py mykivyapp-ios/mykivyapp/
           
 
+      - name: Full Build and Create
+        run: |
+          # 1. בנייה
+          python -m kivy_ios.toolchain build python3 kivy
+          
+          # 2. יצירת תיקייה זמנית למניעת שגיאת unicode
+          mkdir -p /tmp/empty_app
+          echo "import kivy" > /tmp/empty_app/main.py
+          
+          # 3. יצירת הפרויקט בתיקייה הראשית
+          python -m kivy_ios.toolchain create "MyKivyApp" /tmp/empty_app
+          
+          # 4. העתקת הקוד שלך פנימה (הנתיב תוקן)
+          cp -R ./*.py mykivyapp-ios/mykivyapp/
+
       - name: Final Xcode Build
         run: |
-          cd output/mykivyapp-ios
+          # כאן היה התיקון - אנחנו נכנסים ישירות לתיקייה שנוצרה בראשית המאגר
+          cd mykivyapp-ios
           xcodebuild build \
             -project mykivyapp.xcodeproj \
             -scheme mykivyapp \
             -configuration Release \
             -sdk iphoneos \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+            
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app
+          path: mykivyapp-ios/build/Release-iphoneos/*.app
             
       - name: Upload Build
         uses: actions/upload-artifact@v4 # התיקון הקריטי כאן - v4
