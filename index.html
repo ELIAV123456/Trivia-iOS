@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>טריוויה 2026</title>
+    <title>Trivia Quiz 2026</title>
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="icon.png">
 
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
@@ -16,79 +15,130 @@
         body {
             background-color: #1e1e2e;
             color: white;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: -apple-system, system-ui, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 100vh;
             margin: 0;
-            overflow: hidden;
+            text-align: center;
         }
         .card {
             background-color: #2a2a3d;
-            padding: 20px;
-            border-radius: 20px;
+            padding: 30px;
+            border-radius: 25px;
             width: 85%;
-            max-width: 400px;
+            max-width: 450px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+        }
+        h1 { color: #2196F3; font-size: 28px; margin-bottom: 20px; }
+        .question-text { font-size: 22px; margin-bottom: 25px; min-height: 60px; }
+        input {
+            width: 90%;
+            padding: 15px;
+            border-radius: 12px;
+            border: none;
+            background: #3a3a4d;
+            color: white;
+            font-size: 18px;
+            margin-bottom: 15px;
             text-align: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
         button {
             background-color: #4CAF50;
             color: white;
             border: none;
-            padding: 15px;
+            padding: 16px;
             width: 100%;
             border-radius: 12px;
             font-size: 18px;
             font-weight: bold;
-            margin-top: 10px;
             cursor: pointer;
+            transition: 0.2s;
         }
-        input {
-            width: 90%;
-            padding: 12px;
-            border-radius: 10px;
-            border: none;
-            background: #3a3a4d;
-            color: white;
-            text-align: center;
-            font-size: 18px;
-            margin: 10px 0;
-        }
+        button:active { transform: scale(0.98); opacity: 0.8; }
+        .feedback { margin-top: 15px; font-weight: bold; height: 20px; }
     </style>
 </head>
 <body>
 
-    <div class="card" id="game-container">
-        <h1 id="title">טעינה...</h1>
-        <div id="content">
-            <p>המשחק מתכונן, רק רגע...</p>
+    <div class="card">
+        <h1 id="header">🎮 Trivia Quiz</h1>
+        <div id="game-ui" style="display: none;">
+            <div class="question-text" id="q-text">טוען שאלה...</div>
+            <input type="text" id="ans-input" placeholder="הקלד תשובה כאן...">
+            <button id="check-btn">בדוק תשובה</button>
+            <div class="feedback" id="feedback"></div>
+        </div>
+        <div id="start-ui">
+            <p>מוכנים להתחיל?</p>
+            <button id="start-btn">התחל משחק</button>
         </div>
     </div>
 
     <script type="py">
-        from pyscript import display
         import js
+        import json
+        from pyodide.http import pyfetch
+        import random
 
-        # כאן נכנסת הלוגיקה מה-main.py שלך בתרגום קל לווב
-        def start_game(event=None):
-            container = js.document.getElementById("content")
-            container.innerHTML = """
-                <p id='question'>טוען שאלה...</p>
-                <input type='text' id='answer' placeholder='התשובה שלך...'>
-                <button id='submit-btn'>בדוק תשובה</button>
-            """
-            js.document.getElementById("title").innerText = "שאלה 1"
+        DB_URL = "https://triviaquizapp-8b15c-default-rtdb.firebaseio.com/questions.json"
+        questions = []
+        current_idx = 0
+        score = 0
 
-        # הפעלה ראשונית
-        js.document.getElementById("title").innerText = "🎮 Trivia Game"
-        js.document.getElementById("content").innerHTML = '<button id="start-btn">התחל משחק</button>'
-        
-        # חיבור כפתור ההתחלה
-        start_btn = js.document.getElementById("start-btn")
-        start_btn.onclick = start_game
+        async def fetch_questions():
+            global questions
+            try:
+                response = await pyfetch(DB_URL)
+                data = await response.json()
+                # סינון וניקוי נתונים מה-Firebase
+                questions = [v for v in data if v and 'q' in v]
+                random.shuffle(questions)
+                questions = questions[:10]
+            except Exception as e:
+                js.console.log(f"Error: {e}")
+                js.document.getElementById("q-text").innerText = "שגיאה בחיבור לשרת"
+
+        async def start_game(event):
+            js.document.getElementById("start-ui").style.display = "none"
+            js.document.getElementById("game-ui").style.display = "block"
+            await fetch_questions()
+            show_question()
+
+        def show_question():
+            global current_idx
+            if current_idx < len(questions):
+                q = questions[current_idx]
+                js.document.getElementById("q-text").innerText = q['q']
+                js.document.getElementById("ans-input").value = ""
+                js.document.getElementById("feedback").innerText = ""
+                js.document.getElementById("header").innerText = f"שאלה {current_idx + 1}/10"
+            else:
+                js.document.getElementById("game-ui").innerHTML = f"<h2>סיימת!</h2><p>הניקוד שלך: {score}/10</p><button onclick='location.reload()'>שחק שוב</button>"
+
+        def check_answer(event):
+            global current_idx, score
+            user_ans = js.document.getElementById("ans-input").value.strip().lower()
+            correct_ans = str(questions[current_idx]['a']).lower()
+            
+            feedback = js.document.getElementById("feedback")
+            if user_ans == correct_ans:
+                score += 1
+                feedback.innerText = "✅ נכון מאוד!"
+                feedback.style.color = "#4CAF50"
+            else:
+                feedback.innerText = f"❌ טעות. התשובה היא: {correct_ans}"
+                feedback.style.color = "#ff5555"
+            
+            current_idx += 1
+            # מחכה 2 שניות ועובר לשאלה הבאה
+            js.setTimeout(js.create_proxy(show_question), 2000)
+
+        # חיבור כפתורים לפונקציות
+        js.document.getElementById("start-btn").onclick = js.create_proxy(start_game)
+        js.document.getElementById("check-btn").onclick = js.create_proxy(check_answer)
     </script>
 
 </body>
