@@ -24,24 +24,27 @@ jobs:
           # הרצת ה-toolchain כמודול פייתון כדי לעקוף בעיות נתיבים
           python -m kivy_ios.toolchain build python3 kivy
 
-      - name: Create Xcode Project (Safe Mode)
+      - name: Create Xcode Project (The "Bulletproof" Way)
         run: |
-          # 1. יוצרים תיקייה ריקה כדי ש-toolchain לא יתרסק על קבצים קיימים
-          mkdir empty_dir
-          touch empty_dir/main.py
+          # 1. יוצרים תיקייה נקייה לגמרי בנתיב נפרד
+          mkdir -p /tmp/empty_app
+          echo "import kivy" > /tmp/empty_app/main.py
           
-          # 2. יוצרים את פרויקט ה-Xcode מהתיקייה הריקה
-          python -m kivy_ios.toolchain create "MyKivyApp" empty_dir
+          # 2. יוצרים את הפרויקט בתוך תיקייה חדשה בשם 'output'
+          # זה מבטיח שהכלי לא יסרוק שום קובץ מה-GitHub שלך בשלב הזה
+          mkdir -p output
+          cd output
+          python -m kivy_ios.toolchain create "MyKivyApp" /tmp/empty_app
           
-          # 3. עכשיו מעתיקים את הקוד האמיתי שלך לתוך הפרויקט שנוצר
-          # הנתיב הוא בדרך כלל mykivyapp-ios/YourApp
-          cp -R ./*.py mykivyapp-ios/mykivyapp/
-          # אם יש לך תמונות או פונטים, העתק גם אותם:
-          # cp -R ./assets mykivyapp-ios/mykivyapp/ || true
-
+          # 3. עכשיו, כשהשלד מוכן, נעתיק את הקוד האמיתי שלך לתוכו
+          # אנחנו חוזרים לתיקייה הראשית ומעתיקים את כל קבצי הפייתון
+          cd ..
+          cp -R ./*.py output/mykivyapp-ios/mykivyapp/
+          
       - name: Compile App
         run: |
-          cd mykivyapp-ios
+          # נכנסים לתיקייה שנוצרה בתוך output ומריצים את הבנייה
+          cd output/mykivyapp-ios
           xcodebuild build \
             -project mykivyapp.xcodeproj \
             -scheme mykivyapp \
@@ -49,8 +52,7 @@ jobs:
             -sdk iphoneos \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES
+            CODE_SIGN_IDENTITY=""
 
       - name: Upload Build
         uses: actions/upload-artifact@v4 # התיקון הקריטי כאן - v4
