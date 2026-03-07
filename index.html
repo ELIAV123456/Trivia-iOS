@@ -31,7 +31,7 @@
 
     <div class="container">
         <div id="menu-screen" class="screen active">
-            <h1>🎮 Trivia Quiz</h1>
+            <h1>🎮 Trivia Quiz </h1>
             <p id="hello-user" style="color:var(--blue); font-weight:bold;"></p>
             <div id="logged-in-ui" style="display:none">
                 <button class="btn-green" id="start-game-btn">משחק רגיל</button>
@@ -74,7 +74,7 @@
     </div>
 
     <script type="py">
-import js, hashlib, random, json, re
+import js, hashlib, random, json, re, asyncio
 from pyodide.http import pyfetch
 from pyodide.ffi import create_proxy
 
@@ -164,7 +164,7 @@ async def check_room_status():
     try:
         res = await pyfetch(f"{DB_URL}rooms/{current_room_id}.json")
         data = await res.json()
-        if not data: return # החדר נמחק
+        if not data: return 
         if data.get("status") == "active":
             js.document.getElementById("q-text").innerText = "היריב הצטרף!"
             js.setTimeout(create_proxy(next_q), 1000)
@@ -174,7 +174,8 @@ async def check_room_status():
 def next_q():
     global idx, timer_val, timer_event
     if idx >= 10:
-        js.setTimeout(create_proxy(save_and_exit), 100); return
+        asyncio.ensure_future(save_and_exit())
+        return
     timer_val = 15
     js.document.getElementById("q-count").innerText = f"{idx+1}/10"
     js.document.getElementById("q-text").innerText = questions[idx]['q']
@@ -189,14 +190,13 @@ async def update_timer():
     if timer_val > 0:
         timer_val -= 1
         js.document.getElementById("timer").innerText = f"⏱️ {timer_val}"
-        # בדיקת נוכחות יריב ב-PvP
         if is_pvp and current_room_id and timer_val % 4 == 0:
             chk = await pyfetch(f"{DB_URL}rooms/{current_room_id}.json")
             if not await chk.json():
                 js.clearInterval(timer_event)
                 js.alert("היריב עזב. הנקודות שצברת עד כה נשמרו!")
                 await save_and_exit(is_forced=True)
-    if timer_val <= 0: check_ans()
+    if timer_val <= 0: asyncio.ensure_future(check_ans())
 
 async def check_ans(e=None):
     global idx, score, timer_event, correct_in_row
@@ -234,9 +234,7 @@ async def save_and_exit(e=None, is_forced=False):
         except: pass
     
     if is_pvp and current_room_id:
-        try:
-            # מוחק את החדר רק אם לא נמחק כבר ע"י היריב
-            await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="DELETE")
+        try: await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="DELETE")
         except: pass
         current_room_id = None
         
@@ -245,7 +243,9 @@ async def save_and_exit(e=None, is_forced=False):
     update_menu()
 
 async def do_auth(e=None):
-    mode, u, p = js.document.getElementById("auth-title").innerText, js.document.getElementById("auth-u").value.strip(), js.document.getElementById("auth-p").value.strip()
+    mode = js.document.getElementById("auth-title").innerText
+    u = js.document.getElementById("auth-u").value.strip()
+    p = js.document.getElementById("auth-p").value.strip()
     if not u or not p: return
     if mode == "כניסה":
         res = await pyfetch(f"{DB_URL}users/{u}.json")
@@ -266,20 +266,26 @@ async def show_scores(e=None):
         h = "".join([f"<div style='border-bottom:1px solid #444; padding:8px; display:flex; justify-content:space-between;'><span>{n}</span><span>{int(d.get('points',0))}</span></div>" for n, d in sorted_u[:10]])
         js.document.getElementById("leaderboard-content").innerHTML = h
 
+# Wrapper for async buttons
+def run_async(func):
+    def wrapper(e):
+        asyncio.ensure_future(func(e))
+    return create_proxy(wrapper)
+
 # Events
 js.document.getElementById("go-login-btn").onclick = create_proxy(lambda e: (setattr(js.document.getElementById("auth-title"), 'innerText', 'כניסה'), switch_screen("auth-screen")))
 js.document.getElementById("go-reg-btn").onclick = create_proxy(lambda e: (setattr(js.document.getElementById("auth-title"), 'innerText', 'הרשמה'), switch_screen("auth-screen")))
-js.document.getElementById("auth-submit").onclick = create_proxy(do_auth)
+js.document.getElementById("auth-submit").onclick = run_async(do_auth)
 js.document.getElementById("auth-back").onclick = create_proxy(lambda e: switch_screen("menu-screen"))
 js.document.getElementById("logout-btn").onclick = create_proxy(lambda e: (js.localStorage.removeItem("user"), update_menu()))
-js.document.getElementById("start-game-btn").onclick = create_proxy(start_game)
-js.document.getElementById("start-pvp-btn").onclick = create_proxy(start_pvp)
-js.document.getElementById("game-check-btn").onclick = create_proxy(check_ans)
-js.document.getElementById("game-quit-btn").onclick = create_proxy(lambda e: save_and_exit())
-js.document.getElementById("view-scores-btn").onclick = create_proxy(show_scores)
+js.document.getElementById("start-game-btn").onclick = run_async(start_game)
+js.document.getElementById("start-pvp-btn").onclick = run_async(start_pvp)
+js.document.getElementById("game-check-btn").onclick = run_async(check_ans)
+js.document.getElementById("game-quit-btn").onclick = run_async(save_and_exit)
+js.document.getElementById("view-scores-btn").onclick = run_async(show_scores)
 js.document.getElementById("score-back").onclick = create_proxy(lambda e: switch_screen("menu-screen"))
 
-async def on_browser_close(e):
+def on_browser_close(e):
     if is_pvp and current_room_id:
         js.fetch(f"{DB_URL}rooms/{current_room_id}.json", {"method": "DELETE", "keepalive": True})
 js.window.onbeforeunload = create_proxy(on_browser_close)
