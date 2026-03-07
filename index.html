@@ -3,9 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Trivia Quiz Pro 2026</title>
-    <link rel="apple-touch-icon" href="icon.png">
-    <link rel="icon" href="icon.png">
+    <title>Trivia Quiz Pro 2026 - PvP Edition</title>
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <style>
@@ -33,11 +31,11 @@
 
     <div class="container">
         <div id="menu-screen" class="screen active">
-            <h1>🎮 טריוויה 2026</h1>
+            <h1>🎮 טריוויה PvP</h1>
             <p id="hello-user" style="color:var(--blue); font-weight:bold;"></p>
             <div id="logged-in-ui" style="display:none">
-                <button class="btn-green" id="start-game-btn">התחל משחק</button>
-                <button class="btn-purple" id="start-pvp-btn">⚔️ משחק 1 על 1</button>
+                <button class="btn-green" id="start-game-btn">משחק רגיל</button>
+                <button class="btn-purple" id="start-pvp-btn">⚔️ קרב 1 על 1</button>
                 <button class="btn-orange" id="view-scores-btn">לוח תוצאות</button>
                 <button class="btn-exit" id="logout-btn">התנתק</button>
             </div>
@@ -62,17 +60,16 @@
                 <span id="game-score-display" style="color:var(--green); font-size: 20px;">🏆 0</span>
                 <span id="timer" style="color:var(--orange)">⏱️ 15</span>
             </div>
-            <div class="q-card" id="q-text">טוען שאלות...</div>
-            <input type="text" id="game-ans" placeholder="הקלד תשובה..." autocomplete="off">
-            <button class="btn-green" id="game-check-btn">בדוק תשובה</button>
-            <button class="btn-exit" id="game-quit-btn" style="font-size:14px; margin-top: 20px;">פרוש ושמור</button>
+            <div class="q-card" id="q-text">טוען...</div>
+            <input type="text" id="game-ans" placeholder="תשובה..." autocomplete="off">
+            <button class="btn-green" id="game-check-btn">בדוק</button>
             <p id="game-feedback"></p>
         </div>
 
         <div id="score-screen" class="screen">
             <h1>🏆 לוח תוצאות</h1>
-            <div id="leaderboard-content" style="text-align:right; margin:20px 0; background: rgba(0,0,0,0.2); border-radius: 10px; padding: 10px;"></div>
-            <button class="btn-gray" id="score-back">חזרה לתפריט</button>
+            <div id="leaderboard-content" style="text-align:right;"></div>
+            <button class="btn-gray" id="score-back">חזרה</button>
         </div>
     </div>
 
@@ -83,7 +80,7 @@ from pyodide.ffi import create_proxy
 
 DB_URL = "https://triviaquizapp-8b15c-default-rtdb.firebaseio.com/"
 questions, idx, score, timer_val, timer_event = [], 0, 0, 15, None
-correct_in_row = 0
+correct_in_row, current_room_id, is_pvp = 0, None, False
 
 def play_sound(sid):
     try:
@@ -104,37 +101,68 @@ def update_menu():
         js.document.getElementById("logged-in-ui").style.display = "block"
         js.document.getElementById("logged-out-ui").style.display = "none"
     else:
-        js.document.getElementById("hello-user").innerText = ""
         js.document.getElementById("logged-in-ui").style.display = "none"
         js.document.getElementById("logged-out-ui").style.display = "block"
 
 async def start_game(e=None):
-    global questions, idx, score, correct_in_row
-    idx, score, correct_in_row = 0, 0, 0
-    js.document.getElementById("game-score-display").innerText = "🏆 0"
+    global questions, idx, score, correct_in_row, is_pvp, current_room_id
+    idx, score, correct_in_row, is_pvp, current_room_id = 0, 0, 0, False, None
+    res = await pyfetch(f"{DB_URL}questions.json")
+    data = await res.json()
+    questions = random.sample([v for v in data if v], 10)
+    switch_screen("game-screen")
+    next_q()
+
+async def start_pvp(e=None):
+    global questions, idx, score, is_pvp, current_room_id
+    u = js.localStorage.getItem("user")
+    if not u: return js.alert("התחבר קודם!")
     
-    try:
-        res = await pyfetch(f"{DB_URL}questions.json")
-        data = await res.json()
-        questions = [v for v in data if v and 'q' in v]
-        random.shuffle(questions)
-        questions = questions[:10]
-        switch_screen("game-screen")
+    switch_screen("game-screen")
+    js.document.getElementById("q-text").innerText = "מחפש יריב..."
+    is_pvp = True
+    
+    res = await pyfetch(f"{DB_URL}rooms.json")
+    rooms = await res.json()
+    
+    room_id = None
+    if rooms:
+        for r_id, r_data in rooms.items():
+            if r_data.get("status") == "waiting" and r_data.get("player1") != u:
+                room_id = r_id; break
+    
+    if room_id:
+        await pyfetch(f"{DB_URL}rooms/{room_id}.json", method="PATCH", body=json.dumps({"player2": u, "status": "active"}))
+        r_data = await (await pyfetch(f"{DB_URL}rooms/{room_id}.json")).json()
+        questions = r_data['questions']
+        current_room_id = room_id
         next_q()
-    except Exception as ex:
-        js.alert("שגיאה בטעינת השאלות")
+    else:
+        room_id = f"room_{int(js.Date.now())}"
+        q_res = await pyfetch(f"{DB_URL}questions.json")
+        all_q = await q_res.json()
+        questions = random.sample([v for v in all_q if v], 10)
+        await pyfetch(f"{DB_URL}rooms/{room_id}.json", method="PUT", body=json.dumps({
+            "player1": u, "status": "waiting", "questions": questions, "scores": {u: 0}
+        }))
+        current_room_id = room_id
+        wait_for_opponent()
+
+def wait_for_opponent():
+    js.setTimeout(create_proxy(check_room_status), 2000)
+
+async def check_room_status():
+    res = await pyfetch(f"{DB_URL}rooms/{current_room_id}.json")
+    data = await res.json()
+    if data.get("status") == "active": next_q()
+    else: wait_for_opponent()
 
 def next_q():
-    global idx, timer_val, timer_event, score, correct_in_row
-    if idx >= len(questions):
-        if correct_in_row == 10:
-            score += 5
-            js.alert("בונוס מטורף! 10 מתוך 10! קיבלת 5 נקודות בונוס!")
-        js.setTimeout(create_proxy(save_and_exit), 100)
-        return
-
+    global idx, timer_val, timer_event
+    if idx >= 10:
+        js.setTimeout(create_proxy(save_and_exit), 100); return
     timer_val = 15
-    js.document.getElementById("q-count").innerText = f"שאלה {idx+1}/10"
+    js.document.getElementById("q-count").innerText = f"{idx+1}/10"
     js.document.getElementById("q-text").innerText = questions[idx]['q']
     js.document.getElementById("game-ans").value = ""
     js.document.getElementById("game-feedback").innerText = ""
@@ -146,96 +174,73 @@ def update_timer():
     global timer_val
     timer_val -= 1
     js.document.getElementById("timer").innerText = f"⏱️ {timer_val}"
-    if timer_val <= 0: check_ans(None)
+    if timer_val <= 0: check_ans()
 
-def check_ans(e=None):
+async def check_ans(e=None):
     global idx, score, timer_event, correct_in_row
     js.clearInterval(timer_event)
     js.document.getElementById("game-check-btn").disabled = True
-    
     u_ans = js.document.getElementById("game-ans").value.strip().lower()
     c_raw = str(questions[idx]['a']).lower()
     c_list = [a.strip() for a in re.split(r'[/|]', c_raw)]
     
     if u_ans in c_list and u_ans != "":
-        score += 1
-        correct_in_row += 1
+        score += 1; correct_in_row += 1
         play_sound("snd-correct")
-        js.document.getElementById("game-feedback").innerText = "✅ נכון מאוד!"
-        js.document.getElementById("game-feedback").style.color = "var(--green)"
+        js.document.getElementById("game-feedback").innerText = "✅ נכון!"
     else:
         if score > 0: score -= 1
         play_sound("snd-wrong")
-        js.document.getElementById("game-feedback").innerText = f"❌ טעות. התשובה: {c_list[0]}"
-        js.document.getElementById("game-feedback").style.color = "var(--exit)"
+        js.document.getElementById("game-feedback").innerText = f"❌ טעות: {c_list[0]}"
     
     js.document.getElementById("game-score-display").innerText = f"🏆 {int(score)}"
     idx += 1
     js.setTimeout(create_proxy(next_q), 1500)
 
 async def save_and_exit(e=None):
-    global score, timer_event
-    if timer_event: js.clearInterval(timer_event)
+    global score, correct_in_row
     u = js.localStorage.getItem("user")
     if u:
+        final_score = score + 5 if correct_in_row == 10 else score
         res = await pyfetch(f"{DB_URL}users/{u}.json")
         udata = await res.json()
-        old = float(udata.get('points', 0)) if udata and isinstance(udata, dict) else 0.0
-        new_points = max(0, old + float(score))
-        await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": new_points}))
-    
-    js.alert(f"המשחק הסתיים! צברת {int(score)} נקודות בסיבוב זה.")
+        old = udata.get('points', 0) if udata and isinstance(udata, dict) else 0
+        await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": old + final_score}))
+    js.alert(f"הסתיים! צברת {int(score)} נקודות")
     switch_screen("menu-screen")
 
 async def do_auth(e=None):
-    mode = js.document.getElementById("auth-title").innerText
-    u = js.document.getElementById("auth-u").value.strip()
-    p = js.document.getElementById("auth-p").value.strip()
+    mode, u, p = js.document.getElementById("auth-title").innerText, js.document.getElementById("auth-u").value.strip(), js.document.getElementById("auth-p").value.strip()
     if not u or not p: return
-    
     if mode == "כניסה":
         res = await pyfetch(f"{DB_URL}users/{u}.json")
         data = await res.json()
         if data and data.get("password") == hash_p(p):
-            js.localStorage.setItem("user", u)
-            update_menu()
-            switch_screen("menu-screen")
-        else: js.document.getElementById("auth-msg").innerText = "פרטי התחברות שגויים"
+            js.localStorage.setItem("user", u); update_menu(); switch_screen("menu-screen")
+        else: js.alert("טעות בפרטים")
     else:
         await pyfetch(f"{DB_URL}users/{u}.json", method="PUT", body=json.dumps({"password": hash_p(p), "points": 0}))
-        js.localStorage.setItem("user", u)
-        update_menu()
-        switch_screen("menu-screen")
+        js.localStorage.setItem("user", u); update_menu(); switch_screen("menu-screen")
 
 async def show_scores(e=None):
     switch_screen("score-screen")
-    js.document.getElementById("leaderboard-content").innerHTML = "טוען..."
     res = await pyfetch(f"{DB_URL}users.json")
     users = await res.json()
-    if not users: return
     sorted_u = sorted(users.items(), key=lambda x: x[1].get('points', 0) if isinstance(x[1], dict) else 0, reverse=True)
-    h = ""
-    for i, (n, d) in enumerate(sorted_u[:10], 1):
-        p = int(d.get('points', 0)) if isinstance(d, dict) else 0
-        h += f"<div style='display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #444'><span>{i}. {n}</span><span>{p} נק'</span></div>"
+    h = "".join([f"<div style='border-bottom:1px solid #444; padding:5px;'>{n}: {int(d.get('points',0))}</div>" for n, d in sorted_u[:10]])
     js.document.getElementById("leaderboard-content").innerHTML = h
 
-def start_pvp_temp(e=None):
-    js.alert("מצב 1 על 1 בבנייה. נחבר אותו ל-Realtime Database בשלב הבא!")
-
-# Event Listeners
+# Listeners
 js.document.getElementById("go-login-btn").onclick = create_proxy(lambda e: (setattr(js.document.getElementById("auth-title"), 'innerText', 'כניסה'), switch_screen("auth-screen")))
 js.document.getElementById("go-reg-btn").onclick = create_proxy(lambda e: (setattr(js.document.getElementById("auth-title"), 'innerText', 'הרשמה'), switch_screen("auth-screen")))
 js.document.getElementById("auth-submit").onclick = create_proxy(do_auth)
 js.document.getElementById("auth-back").onclick = create_proxy(lambda e: switch_screen("menu-screen"))
 js.document.getElementById("logout-btn").onclick = create_proxy(lambda e: (js.localStorage.removeItem("user"), update_menu()))
 js.document.getElementById("start-game-btn").onclick = create_proxy(start_game)
-js.document.getElementById("start-pvp-btn").onclick = create_proxy(start_pvp_temp)
+js.document.getElementById("start-pvp-btn").onclick = create_proxy(start_pvp)
 js.document.getElementById("game-check-btn").onclick = create_proxy(check_ans)
-js.document.getElementById("game-quit-btn").onclick = create_proxy(save_and_exit)
 js.document.getElementById("view-scores-btn").onclick = create_proxy(show_scores)
 js.document.getElementById("score-back").onclick = create_proxy(lambda e: switch_screen("menu-screen"))
-
 update_menu()
     </script>
 </body>
