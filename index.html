@@ -82,6 +82,7 @@ questions, idx, score, timer_val, timer_event = [], 0, 0, 15, None
 current_room_id, is_pvp, search_event, opponent_name = None, False, None, ""
 waiting_for_finish = False
 i_am_p1 = False
+points_saved = False
 
 def play_sound(sid):
     try:
@@ -108,8 +109,8 @@ def update_menu():
         js.document.getElementById("logged-out-ui").style.display = "block"
 
 async def start_game(e=None):
-    global questions, idx, score, is_pvp, current_room_id, waiting_for_finish
-    idx, score, is_pvp, current_room_id, waiting_for_finish = 0, 0, False, None, False
+    global questions, idx, score, is_pvp, current_room_id, waiting_for_finish, points_saved
+    idx, score, is_pvp, current_room_id, waiting_for_finish, points_saved = 0, 0, False, None, False, False
     js.document.getElementById("game-score-display").innerText = "🏆 0"
     js.document.getElementById("game-check-btn").disabled = False
     js.document.getElementById("game-ans").disabled = False
@@ -120,11 +121,11 @@ async def start_game(e=None):
     next_q()
 
 async def start_pvp(e=None):
-    global questions, idx, score, is_pvp, current_room_id, search_event, opponent_name, waiting_for_finish, i_am_p1
+    global questions, idx, score, is_pvp, current_room_id, search_event, opponent_name, waiting_for_finish, i_am_p1, points_saved
     u = js.localStorage.getItem("user")
     if not u: return js.alert("התחבר קודם!")
     
-    idx, score, is_pvp, waiting_for_finish = 0, 0, True, False
+    idx, score, is_pvp, waiting_for_finish, points_saved = 0, 0, True, False, False
     js.document.getElementById("game-score-display").innerText = "🏆 0"
     switch_screen("game-screen")
     js.document.getElementById("q-text").innerText = "מחפש יריב..."
@@ -223,70 +224,89 @@ async def check_ans(e=None):
     js.setTimeout(create_proxy(next_q), 1200)
 
 async def finish_game_flow():
-    global waiting_for_finish, is_pvp, i_am_p1
+    global waiting_for_finish, is_pvp, i_am_p1, score
     if not is_pvp:
+        await add_points_to_user(score)
         await save_and_exit(win=True)
         return
 
     waiting_for_finish = True
     u = js.localStorage.getItem("user")
-    js.document.getElementById("q-text").innerText = "ממתין ליריב שיסיים..."
+    js.document.getElementById("q-text").innerText = "ממתין ליריב..."
     js.document.getElementById("game-check-btn").disabled = True
     js.document.getElementById("game-ans").disabled = True
 
+    # עדכון מיידי של הציון בחדר
     field = "p1_score" if i_am_p1 else "p2_score"
     await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="PATCH", body=json.dumps({field: score}))
     
-    while waiting_for_finish:
+    # לולאת בדיקה
+    max_checks = 30 # הגבלה של דקה כדי לא להיתקע לנצח
+    checks = 0
+    while waiting_for_finish and checks < max_checks:
+        checks += 1
         await asyncio.sleep(2)
         try:
             chk = await pyfetch(f"{DB_URL}rooms/{current_room_id}.json")
             data = await chk.json()
             
-            # אם החדר נמחק לגמרי והוא עוד לא קיבל תוצאה
-            if not data:
-                js.alert("החדר נסגר.")
-                await save_and_exit(win=False); break
+            if not data: # החדר נמחק (כנראה היריב ראה תוצאה ויצא)
+                await save_and_exit(win=False, alert_msg="המשחק הסתיים.")
+                break
             
             p1s, p2s = data.get("p1_score"), data.get("p2_score")
             
-            # בדיקה אם שני השחקנים הזינו ניקוד
             if p1s != -1 and p2s != -1:
                 my_s = p1s if i_am_p1 else p2s
                 op_s = p2s if i_am_p1 else p1s
                 
                 if my_s > op_s:
-                    js.alert(f"🏆 ניצחת!!\nהתוצאה: {int(my_s)} - {int(op_s)}")
-                    await save_and_exit(win=True)
+                    await add_points_to_user(my_s)
+                    await save_and_exit(win=True, alert_msg=f"🏆 ניצחת!!\n{int(my_s)} - {int(op_s)}")
                 elif my_s < op_s:
-                    js.alert(f"😞 הפסדת...\nהתוצאה: {int(my_s)} - {int(op_s)}")
-                    await save_and_exit(win=False)
+                    await save_and_exit(win=False, alert_msg=f"😞 הפסדת...\n{int(my_s)} - {int(op_s)}")
                 else:
-                    js.alert(f"🤝 תיקו!\nשניכם תקבלו נקודות.")
-                    await save_and_exit(win=True)
+                    await add_points_to_user(my_s)
+                    await save_and_exit(win=True, alert_msg=f"🤝 תיקו!\n{int(my_s)} - {int(op_s)}")
                 break
-            
-            # אם השחקן השני עדיין בחדר אבל עוד לא סיים, נמשיך לחכות
         except: break
-
-async def save_and_exit(win=True, is_forced=False):
-    global score, timer_event, current_room_id, search_event, waiting_for_finish, i_am_p1
-    waiting_for_finish = False
-    if timer_event: js.clearInterval(timer_event)
-    if search_event: js.clearInterval(search_event)
     
+    if checks >= max_checks:
+        js.alert("היריב לא סיים בזמן.")
+        await save_and_exit(win=False)
+
+async def add_points_to_user(pts):
+    global points_saved
+    if points_saved or pts <= 0: return
     u = js.localStorage.getItem("user")
-    if u and score > 0 and win:
+    if u:
         try:
             res = await pyfetch(f"{DB_URL}users/{u}.json")
             udata = await res.json()
             old = udata.get('points', 0) if isinstance(udata, dict) else 0
-            await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": old + score}))
+            await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": old + pts}))
+            points_saved = True
         except: pass
+
+async def save_and_exit(win=True, alert_msg=None):
+    global current_room_id, search_event, waiting_for_finish, i_am_p1
+    waiting_for_finish = False
+    if search_event: js.clearInterval(search_event)
     
-    # רק השחקן הראשון (מנהל החדר) מוחק את החדר מהשרת בסיום
-    if current_room_id and i_am_p1:
-        try: await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="DELETE")
+    if alert_msg: js.alert(alert_msg)
+    
+    # השחקן השני שיוצא מוחק את החדר (כדי שהראשון יספיק לראות)
+    # או שחקן שמנהל חדר והיריב לא נכנס
+    if current_room_id:
+        try:
+            res = await pyfetch(f"{DB_URL}rooms/{current_room_id}.json")
+            data = await res.json()
+            if data:
+                # אם שני הניקודים קיימים, זה שיוצא עכשיו מוחק
+                if data.get("p1_score") != -1 and data.get("p2_score") != -1:
+                    await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="DELETE")
+                elif i_am_p1 and data.get("status") == "waiting":
+                    await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="DELETE")
         except: pass
     
     current_room_id = None
@@ -297,35 +317,35 @@ async def do_auth(e=None):
     mode = js.document.getElementById("auth-title").innerText
     u, p = js.document.getElementById("auth-u").value.strip(), js.document.getElementById("auth-p").value.strip()
     if not u or not p: return
-    res = await pyfetch(f"{DB_URL}users/{u}.json")
-    data = await res.json()
-    if mode == "כניסה":
-        if data and data.get("password") == hash_p(p):
+    try:
+        res = await pyfetch(f"{DB_URL}users/{u}.json")
+        data = await res.json()
+        if mode == "כניסה":
+            if data and data.get("password") == hash_p(p):
+                js.localStorage.setItem("user", u); update_menu(); switch_screen("menu-screen")
+            else: js.alert("פרטים שגויים")
+        else:
+            await pyfetch(f"{DB_URL}users/{u}.json", method="PUT", body=json.dumps({"password": hash_p(p), "points": 0}))
             js.localStorage.setItem("user", u); update_menu(); switch_screen("menu-screen")
-        else: js.alert("פרטים שגויים")
-    else:
-        await pyfetch(f"{DB_URL}users/{u}.json", method="PUT", body=json.dumps({"password": hash_p(p), "points": 0}))
-        js.localStorage.setItem("user", u); update_menu(); switch_screen("menu-screen")
+    except: js.alert("שגיאה")
 
 async def show_scores(e=None):
     u_me = js.localStorage.getItem("user")
     switch_screen("score-screen")
-    res = await pyfetch(f"{DB_URL}users.json")
-    users = await res.json()
-    if users:
-        sorted_u = sorted(users.items(), key=lambda x: x[1].get('points', 0) if isinstance(x[1], dict) else 0, reverse=True)
-        h = ""
-        for n, d in sorted_u[:10]:
-            is_me = (n == u_me)
-            row_class = "class='my-row'" if is_me else ""
-            h += f"<div {row_class} style='padding:12px; border-bottom:1px solid #444; display:flex; justify-content:space-between;'>"
-            h += f"<span>{'⭐ ' if is_me else ''}{n}</span><span>{int(d.get('points',0))}</span></div>"
-        js.document.getElementById("leaderboard-content").innerHTML = h
-
-def cleanup(e):
-    if current_room_id and i_am_p1:
-        js.fetch(f"{DB_URL}rooms/{current_room_id}.json", {"method": "DELETE", "keepalive": True})
-js.window.onbeforeunload = create_proxy(cleanup)
+    js.document.getElementById("leaderboard-content").innerHTML = "טוען..."
+    try:
+        res = await pyfetch(f"{DB_URL}users.json")
+        users = await res.json()
+        if users:
+            sorted_u = sorted(users.items(), key=lambda x: x[1].get('points', 0) if isinstance(x[1], dict) else 0, reverse=True)
+            h = ""
+            for n, d in sorted_u[:10]:
+                is_me = (n == u_me)
+                row_class = "class='my-row'" if is_me else ""
+                h += f"<div {row_class} style='padding:12px; border-bottom:1px solid #444; display:flex; justify-content:space-between;'>"
+                h += f"<span>{'⭐ ' if is_me else ''}{n}</span><span>{int(d.get('points',0))}</span></div>"
+            js.document.getElementById("leaderboard-content").innerHTML = h
+    except: pass
 
 def run_async(func):
     def wrapper(e): asyncio.ensure_future(func(e))
