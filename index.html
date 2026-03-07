@@ -63,6 +63,7 @@
                 <div id="my-final-score">הציון שלך: 0</div>
                 <div id="op-final-score" style="color:var(--orange)">היריב מחשב תוצאה...</div>
             </div>
+            <p id="pvp-status-msg" style="font-size:14px; color:#aaa;">ממתין לסנכרון סופי (עד 60 שניות)...</p>
             <button class="btn-blue" id="back-to-menu-btn" style="display:none">חזרה לתפריט</button>
         </div>
 
@@ -131,7 +132,7 @@ async def start_pvp(e=None):
     idx, score, is_pvp, game_active = 0, 0, True, False
     switch_screen("game-screen")
     js.document.getElementById("q-text").innerText = "מחפש יריב..."
-    js.document.getElementById("game-check-btn").disabled = True # נטרול כפתור בחיפוש
+    js.document.getElementById("game-check-btn").disabled = True
     
     r_res = await pyfetch(f"{DB_URL}rooms.json")
     rooms = await r_res.json() if r_res.status == 200 else None
@@ -143,8 +144,7 @@ async def start_pvp(e=None):
                 target = rid; break
     
     if target:
-        i_am_p1 = False
-        current_room_id = target
+        i_am_p1 = False; current_room_id = target
         await pyfetch(f"{DB_URL}rooms/{target}.json", method="PATCH", body=json.dumps({"player2": u, "status": "active"}))
         data = await (await pyfetch(f"{DB_URL}rooms/{target}.json")).json()
         questions = data['questions']
@@ -152,8 +152,7 @@ async def start_pvp(e=None):
         js.document.getElementById("game-check-btn").disabled = False
         next_q()
     else:
-        i_am_p1 = True
-        current_room_id = f"room_{int(js.Date.now())}"
+        i_am_p1 = True; current_room_id = f"room_{int(js.Date.now())}"
         q_res = await pyfetch(f"{DB_URL}questions.json")
         questions = random.sample([v for v in await q_res.json() if v], 10)
         await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="PUT", body=json.dumps({
@@ -220,7 +219,7 @@ async def check_ans(e=None):
 async def quit_and_save(e=None):
     global game_active
     if not game_active: return
-    if js.confirm("בטוח שברצונך לפרוש ולשמור את הנקודות שצברת?"):
+    if js.confirm("בטוח שברצונך לפרוש ולשמור את הנקודות?"):
         game_active = False
         await add_pts(score)
         if is_pvp and current_room_id:
@@ -233,7 +232,6 @@ async def finish_game():
     global game_active
     game_active = False
     if timer_event: js.clearInterval(timer_event)
-    
     if not is_pvp:
         await add_pts(score)
         js.alert(f"המשחק הסתיים! צברת {int(score)} נקודות.")
@@ -247,17 +245,29 @@ async def finish_game():
         asyncio.ensure_future(monitor_results())
 
 async def monitor_results():
+    start_time = js.Date.now()
     while True:
         await asyncio.sleep(2)
+        # טיימר ביטחון: אם עברו 60 שניות והיריב לא הגיב
+        if js.Date.now() - start_time > 60000:
+            js.alert("היריב לא זמין. חוזר לתפריט עם הנקודות שלך.")
+            await add_pts(score)
+            switch_screen("menu-screen")
+            break
+            
         try:
             res = await pyfetch(f"{DB_URL}rooms/{current_room_id}.json")
             data = await res.json()
-            if not data: break
+            if not data:
+                js.alert("החדר נסגר.")
+                switch_screen("menu-screen"); break
+            
             p1s, p2s = data.get("p1_score"), data.get("p2_score")
             if p1s != -1 and p2s != -1:
                 my_s, op_s = (p1s, p2s) if i_am_p1 else (p2s, p1s)
                 js.document.getElementById("op-final-score").innerText = f"ציון היריב: {int(op_s)}"
                 js.document.getElementById("back-to-menu-btn").style.display = "block"
+                js.document.getElementById("pvp-status-msg").innerText = "התוצאות התקבלו!"
                 
                 if my_s > op_s:
                     js.document.getElementById("result-title").innerText = "🏆 ניצחת!"
