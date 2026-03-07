@@ -72,7 +72,7 @@
                 <div id="my-final-score">הציון שלך: 0</div>
                 <div id="op-final-score" class="waiting" style="margin-top:10px;">ממתין ליריב...</div>
             </div>
-            <p id="auto-return-msg" style="font-size:14px; color:#aaa;">חוזר לתפריט אוטומטית בסיום...</p>
+            <p id="auto-return-msg" style="font-size:14px; color:#aaa;">הניקוד יישמר ותועבר לתפריט אוטומטית...</p>
         </div>
 
         <div id="score-screen" class="screen">
@@ -148,7 +148,6 @@ async def start_pvp(e=None):
     js.document.getElementById("game-check-btn").disabled = True
     js.document.getElementById("q-text").innerHTML = "<span class='waiting'>מחפש יריב...</span>"
     
-    # ניקוי חדרים ישנים
     r_res = await pyfetch(f"{DB_URL}rooms.json")
     rooms = await r_res.json() if r_res.status == 200 else None
     now = int(js.Date.now())
@@ -250,7 +249,7 @@ async def finish():
     if timer_event: js.clearInterval(timer_event)
     if not is_pvp:
         added = await add_pts(score)
-        js.alert(f"המשחק הסתיים! הוספת {added} נקודות.")
+        js.alert(f"המשחק הסתיים! הרווחת {int(score)} נקודות.")
         switch_screen("menu-screen"); update_menu()
     else:
         switch_screen("result-screen")
@@ -261,6 +260,7 @@ async def finish():
 
 async def monitor_and_quit():
     timeout = 15
+    final_pts_to_alert = 0
     while timeout > 0:
         await asyncio.sleep(1)
         timeout -= 1
@@ -275,13 +275,27 @@ async def monitor_and_quit():
                 js.document.getElementById("op-final-score").innerText = f"ציון היריב: {int(op_s)}"
                 if my_s > op_s: 
                     js.document.getElementById("result-title").innerText = "🏆 ניצחת!"
-                    await add_pts(my_s)
-                elif my_s < op_s: js.document.getElementById("result-title").innerText = "😞 הפסדת"
-                else: await add_pts(my_s)
-                await asyncio.sleep(4)
+                    final_pts_to_alert = await add_pts(my_s)
+                elif my_s < op_s: 
+                    js.document.getElementById("result-title").innerText = "😞 הפסדת"
+                    final_pts_to_alert = 0
+                else: 
+                    js.document.getElementById("result-title").innerText = "🤝 תיקו"
+                    final_pts_to_alert = await add_pts(my_s)
+                await asyncio.sleep(2)
                 break
             await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="PATCH", body=json.dumps({"last_pulse": int(js.Date.now())}))
         except: break
+    
+    # אם הגענו ל-timeout בלי תוצאת יריב (ניצחון טכני)
+    if timeout <= 0 and final_pts_to_alert == 0:
+        final_pts_to_alert = await add_pts(score)
+        js.alert(f"היריב עזב. ניצחון טכני! הרווחת {int(score)} נקודות.")
+    elif final_pts_to_alert > 0:
+        js.alert(f"המשחק הסתיים! הרווחת {int(final_pts_to_alert)} נקודות.")
+    else:
+        js.alert("המשחק הסתיים. לא נוספו נקודות הפעם.")
+
     if i_am_p1: await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="DELETE")
     switch_screen("menu-screen"); update_menu()
 
@@ -290,7 +304,8 @@ async def handle_quit(e=None):
     game_active = False
     if timer_event: js.clearInterval(timer_event)
     if is_pvp and current_room_id: await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="DELETE")
-    await add_pts(score)
+    added = await add_pts(score)
+    js.alert(f"יצאת מהמשחק. הרווחת {int(added)} נקודות.")
     switch_screen("menu-screen"); update_menu()
 
 async def show_scores(e=None):
@@ -321,7 +336,7 @@ async def do_auth(e=None):
         data = await res.json()
         if data and data.get("password") == h_p:
             js.localStorage.setItem("user", u); update_menu(); switch_screen("menu-screen")
-        else: js.alert("שגיאה")
+        else: js.alert("שגיאה בפרטים")
     else:
         await pyfetch(f"{DB_URL}users/{u}.json", method="PUT", body=json.dumps({"password": h_p, "points": 0}))
         js.localStorage.setItem("user", u); update_menu(); switch_screen("menu-screen")
