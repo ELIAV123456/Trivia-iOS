@@ -3,35 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Trivia Quiz</title>
+    <title>Trivia Quiz Pro 2026</title>
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png">
-    <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <style>
-        :root { --bg: #1e1e2e; --card: #2a2a3d; --green: #4CAF50; --blue: #2196F3; --orange: #FF9800; --exit: #ff5555; }
+        :root { --bg: #1e1e2e; --card: #2a2a3d; --green: #4CAF50; --blue: #2196F3; --orange: #FF9800; --exit: #ff5555; --purple: #9c27b0; }
         body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
         .container { background: var(--card); padding: 30px; border-radius: 25px; width: 85%; max-width: 450px; box-shadow: 0 15px 35px rgba(0,0,0,0.6); text-align: center; }
         .screen { display: none; flex-direction: column; }
         .active { display: flex; }
-        input { width: 100%; padding: 15px; margin-bottom: 15px; border-radius: 12px; border: none; background: #3a3a4d; color: white; text-align: center; box-sizing: border-box; }
-        button { width: 100%; padding: 16px; margin: 8px 0; border-radius: 12px; border: none; color: white; font-size: 18px; font-weight: bold; cursor: pointer; }
+        input { width: 100%; padding: 15px; margin-bottom: 15px; border-radius: 12px; border: none; background: #3a3a4d; color: white; text-align: center; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 16px; margin: 8px 0; border-radius: 12px; border: none; color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:active { transform: scale(0.95); }
         .btn-green { background: var(--green); }
         .btn-blue { background: var(--blue); }
         .btn-orange { background: var(--orange); }
         .btn-exit { background: var(--exit); }
+        .btn-purple { background: var(--purple); }
         .btn-gray { background: #555; }
-        .q-card { background: #33334d; padding: 20px; border-radius: 15px; margin: 20px 0; min-height: 60px; display: flex; align-items: center; justify-content: center; }
+        .q-card { background: #33334d; padding: 20px; border-radius: 15px; margin: 20px 0; min-height: 60px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; }
+        #game-feedback { font-weight: bold; height: 24px; margin-top: 10px; }
     </style>
 </head>
 <body>
+    <audio id="snd-correct" src="sounds/correct.mp3"></audio>
+    <audio id="snd-wrong" src="sounds/wrong.mp3"></audio>
+
     <div class="container">
         <div id="menu-screen" class="screen active">
             <h1>🎮 טריוויה 2026</h1>
-            <p id="hello-user" style="color:var(--blue)"></p>
+            <p id="hello-user" style="color:var(--blue); font-weight:bold;"></p>
             <div id="logged-in-ui" style="display:none">
                 <button class="btn-green" id="start-game-btn">התחל משחק</button>
+                <button class="btn-purple" id="start-pvp-btn">⚔️ משחק 1 על 1</button>
                 <button class="btn-orange" id="view-scores-btn">לוח תוצאות</button>
                 <button class="btn-exit" id="logout-btn">התנתק</button>
             </div>
@@ -40,6 +46,7 @@
                 <button class="btn-blue" id="go-reg-btn">הרשמה</button>
             </div>
         </div>
+
         <div id="auth-screen" class="screen">
             <h1 id="auth-title">כניסה</h1>
             <input type="text" id="auth-u" placeholder="שם משתמש">
@@ -48,21 +55,24 @@
             <button class="btn-green" id="auth-submit">אישור</button>
             <button class="btn-gray" id="auth-back">חזרה</button>
         </div>
+
         <div id="game-screen" class="screen">
-            <div style="display:flex; justify-content:space-between">
+            <div style="display:flex; justify-content:space-between; align-items: center;">
                 <span id="q-count">1/10</span>
+                <span id="game-score-display" style="color:var(--green); font-size: 20px;">🏆 0</span>
                 <span id="timer" style="color:var(--orange)">⏱️ 15</span>
             </div>
-            <div class="q-card" id="q-text">טוען...</div>
-            <input type="text" id="game-ans" placeholder="תשובה..." autocomplete="off">
-            <button class="btn-green" id="game-check-btn">בדוק</button>
-            <button class="btn-exit" id="game-quit-btn" style="font-size:14px">פרוש ושמור</button>
+            <div class="q-card" id="q-text">טוען שאלות...</div>
+            <input type="text" id="game-ans" placeholder="הקלד תשובה..." autocomplete="off">
+            <button class="btn-green" id="game-check-btn">בדוק תשובה</button>
+            <button class="btn-exit" id="game-quit-btn" style="font-size:14px; margin-top: 20px;">פרוש ושמור</button>
             <p id="game-feedback"></p>
         </div>
+
         <div id="score-screen" class="screen">
             <h1>🏆 לוח תוצאות</h1>
-            <div id="leaderboard-content" style="text-align:right; margin:20px 0"></div>
-            <button class="btn-gray" id="score-back">חזרה</button>
+            <div id="leaderboard-content" style="text-align:right; margin:20px 0; background: rgba(0,0,0,0.2); border-radius: 10px; padding: 10px;"></div>
+            <button class="btn-gray" id="score-back">חזרה לתפריט</button>
         </div>
     </div>
 
@@ -73,6 +83,13 @@ from pyodide.ffi import create_proxy
 
 DB_URL = "https://triviaquizapp-8b15c-default-rtdb.firebaseio.com/"
 questions, idx, score, timer_val, timer_event = [], 0, 0, 15, None
+correct_in_row = 0
+
+def play_sound(sid):
+    try:
+        js.document.getElementById(sid).currentTime = 0
+        js.document.getElementById(sid).play()
+    except: pass
 
 def hash_p(p): return hashlib.sha256((p + "TriviaPro2026").encode()).hexdigest()
 
@@ -92,21 +109,30 @@ def update_menu():
         js.document.getElementById("logged-out-ui").style.display = "block"
 
 async def start_game(e=None):
-    global questions, idx, score
-    idx, score = 0, 0
-    res = await pyfetch(f"{DB_URL}questions.json")
-    data = await res.json()
-    questions = [v for v in data if v and 'q' in v]
-    random.shuffle(questions)
-    questions = questions[:10]
-    switch_screen("game-screen")
-    next_q()
+    global questions, idx, score, correct_in_row
+    idx, score, correct_in_row = 0, 0, 0
+    js.document.getElementById("game-score-display").innerText = "🏆 0"
+    
+    try:
+        res = await pyfetch(f"{DB_URL}questions.json")
+        data = await res.json()
+        questions = [v for v in data if v and 'q' in v]
+        random.shuffle(questions)
+        questions = questions[:10]
+        switch_screen("game-screen")
+        next_q()
+    except Exception as ex:
+        js.alert("שגיאה בטעינת השאלות")
 
 def next_q():
-    global idx, timer_val, timer_event
+    global idx, timer_val, timer_event, score, correct_in_row
     if idx >= len(questions):
+        if correct_in_row == 10:
+            score += 5
+            js.alert("בונוס מטורף! 10 מתוך 10! קיבלת 5 נקודות בונוס!")
         js.setTimeout(create_proxy(save_and_exit), 100)
         return
+
     timer_val = 15
     js.document.getElementById("q-count").innerText = f"שאלה {idx+1}/10"
     js.document.getElementById("q-text").innerText = questions[idx]['q']
@@ -123,17 +149,27 @@ def update_timer():
     if timer_val <= 0: check_ans(None)
 
 def check_ans(e=None):
-    global idx, score, timer_event
+    global idx, score, timer_event, correct_in_row
     js.clearInterval(timer_event)
     js.document.getElementById("game-check-btn").disabled = True
+    
     u_ans = js.document.getElementById("game-ans").value.strip().lower()
     c_raw = str(questions[idx]['a']).lower()
     c_list = [a.strip() for a in re.split(r'[/|]', c_raw)]
+    
     if u_ans in c_list and u_ans != "":
         score += 1
-        js.document.getElementById("game-feedback").innerText = "✅ נכון!"
+        correct_in_row += 1
+        play_sound("snd-correct")
+        js.document.getElementById("game-feedback").innerText = "✅ נכון מאוד!"
+        js.document.getElementById("game-feedback").style.color = "var(--green)"
     else:
-        js.document.getElementById("game-feedback").innerText = f"❌ טעות: {c_list[0]}"
+        if score > 0: score -= 1
+        play_sound("snd-wrong")
+        js.document.getElementById("game-feedback").innerText = f"❌ טעות. התשובה: {c_list[0]}"
+        js.document.getElementById("game-feedback").style.color = "var(--exit)"
+    
+    js.document.getElementById("game-score-display").innerText = f"🏆 {int(score)}"
     idx += 1
     js.setTimeout(create_proxy(next_q), 1500)
 
@@ -141,18 +177,22 @@ async def save_and_exit(e=None):
     global score, timer_event
     if timer_event: js.clearInterval(timer_event)
     u = js.localStorage.getItem("user")
-    if u and score > 0:
+    if u:
         res = await pyfetch(f"{DB_URL}users/{u}.json")
         udata = await res.json()
         old = float(udata.get('points', 0)) if udata and isinstance(udata, dict) else 0.0
-        await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": old + float(score)}))
-    js.alert(f"ניקוד: {int(score)}")
+        new_points = max(0, old + float(score))
+        await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": new_points}))
+    
+    js.alert(f"המשחק הסתיים! צברת {int(score)} נקודות בסיבוב זה.")
     switch_screen("menu-screen")
 
 async def do_auth(e=None):
     mode = js.document.getElementById("auth-title").innerText
-    u, p = js.document.getElementById("auth-u").value.strip(), js.document.getElementById("auth-p").value.strip()
+    u = js.document.getElementById("auth-u").value.strip()
+    p = js.document.getElementById("auth-p").value.strip()
     if not u or not p: return
+    
     if mode == "כניסה":
         res = await pyfetch(f"{DB_URL}users/{u}.json")
         data = await res.json()
@@ -160,32 +200,42 @@ async def do_auth(e=None):
             js.localStorage.setItem("user", u)
             update_menu()
             switch_screen("menu-screen")
-        else: js.document.getElementById("auth-msg").innerText = "פרטים שגויים"
+        else: js.document.getElementById("auth-msg").innerText = "פרטי התחברות שגויים"
     else:
         await pyfetch(f"{DB_URL}users/{u}.json", method="PUT", body=json.dumps({"password": hash_p(p), "points": 0}))
+        js.localStorage.setItem("user", u)
+        update_menu()
         switch_screen("menu-screen")
 
 async def show_scores(e=None):
     switch_screen("score-screen")
+    js.document.getElementById("leaderboard-content").innerHTML = "טוען..."
     res = await pyfetch(f"{DB_URL}users.json")
     users = await res.json()
+    if not users: return
     sorted_u = sorted(users.items(), key=lambda x: x[1].get('points', 0) if isinstance(x[1], dict) else 0, reverse=True)
     h = ""
-    for i, (n, d) in enumerate(sorted_u[:5], 1):
+    for i, (n, d) in enumerate(sorted_u[:10], 1):
         p = int(d.get('points', 0)) if isinstance(d, dict) else 0
-        h += f"<div style='display:flex; justify-content:space-between; padding:5px'><span>{i}. {n}</span><span>{p}</span></div>"
+        h += f"<div style='display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #444'><span>{i}. {n}</span><span>{p} נק'</span></div>"
     js.document.getElementById("leaderboard-content").innerHTML = h
 
+def start_pvp_temp(e=None):
+    js.alert("מצב 1 על 1 בבנייה. נחבר אותו ל-Realtime Database בשלב הבא!")
+
+# Event Listeners
 js.document.getElementById("go-login-btn").onclick = create_proxy(lambda e: (setattr(js.document.getElementById("auth-title"), 'innerText', 'כניסה'), switch_screen("auth-screen")))
 js.document.getElementById("go-reg-btn").onclick = create_proxy(lambda e: (setattr(js.document.getElementById("auth-title"), 'innerText', 'הרשמה'), switch_screen("auth-screen")))
 js.document.getElementById("auth-submit").onclick = create_proxy(do_auth)
 js.document.getElementById("auth-back").onclick = create_proxy(lambda e: switch_screen("menu-screen"))
 js.document.getElementById("logout-btn").onclick = create_proxy(lambda e: (js.localStorage.removeItem("user"), update_menu()))
 js.document.getElementById("start-game-btn").onclick = create_proxy(start_game)
+js.document.getElementById("start-pvp-btn").onclick = create_proxy(start_pvp_temp)
 js.document.getElementById("game-check-btn").onclick = create_proxy(check_ans)
 js.document.getElementById("game-quit-btn").onclick = create_proxy(save_and_exit)
 js.document.getElementById("view-scores-btn").onclick = create_proxy(show_scores)
 js.document.getElementById("score-back").onclick = create_proxy(lambda e: switch_screen("menu-screen"))
+
 update_menu()
     </script>
 </body>
