@@ -63,6 +63,7 @@
             <div class="q-card" id="q-text">טוען...</div>
             <input type="text" id="game-ans" placeholder="תשובה..." autocomplete="off">
             <button class="btn-green" id="game-check-btn">בדוק</button>
+            <button class="btn-exit" id="game-quit-btn" style="font-size:14px; margin-top:15px;">🚪 פרוש ושמור</button>
             <p id="game-feedback"></p>
         </div>
 
@@ -101,6 +102,7 @@ def update_menu():
         js.document.getElementById("logged-in-ui").style.display = "block"
         js.document.getElementById("logged-out-ui").style.display = "none"
     else:
+        js.document.getElementById("hello-user").innerText = ""
         js.document.getElementById("logged-in-ui").style.display = "none"
         js.document.getElementById("logged-out-ui").style.display = "block"
 
@@ -201,33 +203,43 @@ async def check_ans(e=None):
         score += 1; correct_in_row += 1
         play_sound("snd-correct")
         js.document.getElementById("game-feedback").innerText = "✅ נכון!"
+        js.document.getElementById("game-feedback").style.color = "var(--green)"
     else:
-        if score > 0: score -= 1
+        # בדיקה קריטית: מוריד נקודה רק אם יש יותר מ-0 כדי למנוע ארור
+        if score > 0: 
+            score -= 1
         correct_in_row = 0
         play_sound("snd-wrong")
         js.document.getElementById("game-feedback").innerText = f"❌ טעות: {c_list[0]}"
+        js.document.getElementById("game-feedback").style.color = "var(--exit)"
     
     js.document.getElementById("game-score-display").innerText = f"🏆 {int(score)}"
     idx += 1
     js.setTimeout(create_proxy(next_q), 1500)
 
 async def save_and_exit(e=None):
-    global score, timer_event, current_room_id, is_pvp
+    global score, timer_event, current_room_id, is_pvp, correct_in_row
     if timer_event: js.clearInterval(timer_event)
     u = js.localStorage.getItem("user")
     if u:
         bonus = 5 if correct_in_row == 10 else 0
-        res = await pyfetch(f"{DB_URL}users/{u}.json")
-        udata = await res.json()
-        old = udata.get('points', 0) if udata and isinstance(udata, dict) else 0
-        await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": old + score + bonus}))
-    
-    # מחיקת החדר מה-DB בסיום כדי לא להעמיס
-    if is_pvp and current_room_id:
-        await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="DELETE")
+        final_to_add = score + bonus
         
-    js.alert(f"הסתיים! ניקוד: {int(score)}")
+        # עדכון ב-Database
+        try:
+            res = await pyfetch(f"{DB_URL}users/{u}.json")
+            udata = await res.json()
+            old = udata.get('points', 0) if udata and isinstance(udata, dict) else 0
+            await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": old + final_to_add}))
+        except: pass
+    
+    if is_pvp and current_room_id:
+        try: await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="DELETE")
+        except: pass
+        
+    js.alert(f"המשחק נגמר. צברת {int(score)} נקודות.")
     switch_screen("menu-screen")
+    update_menu()
 
 async def do_auth(e=None):
     mode, u, p = js.document.getElementById("auth-title").innerText, js.document.getElementById("auth-u").value.strip(), js.document.getElementById("auth-p").value.strip()
@@ -248,10 +260,10 @@ async def show_scores(e=None):
     users = await res.json()
     if users:
         sorted_u = sorted(users.items(), key=lambda x: x[1].get('points', 0) if isinstance(x[1], dict) else 0, reverse=True)
-        h = "".join([f"<div style='border-bottom:1px solid #444; padding:5px;'>{n}: {int(d.get('points',0))}</div>" for n, d in sorted_u[:10]])
+        h = "".join([f"<div style='border-bottom:1px solid #444; padding:8px; display:flex; justify-content:space-between;'><span>{n}</span><span>{int(d.get('points',0))}</span></div>" for n, d in sorted_u[:10]])
         js.document.getElementById("leaderboard-content").innerHTML = h
 
-# Event Listeners
+# הגדרת אירועים
 js.document.getElementById("go-login-btn").onclick = create_proxy(lambda e: (setattr(js.document.getElementById("auth-title"), 'innerText', 'כניסה'), switch_screen("auth-screen")))
 js.document.getElementById("go-reg-btn").onclick = create_proxy(lambda e: (setattr(js.document.getElementById("auth-title"), 'innerText', 'הרשמה'), switch_screen("auth-screen")))
 js.document.getElementById("auth-submit").onclick = create_proxy(do_auth)
@@ -260,8 +272,10 @@ js.document.getElementById("logout-btn").onclick = create_proxy(lambda e: (js.lo
 js.document.getElementById("start-game-btn").onclick = create_proxy(start_game)
 js.document.getElementById("start-pvp-btn").onclick = create_proxy(start_pvp)
 js.document.getElementById("game-check-btn").onclick = create_proxy(check_ans)
+js.document.getElementById("game-quit-btn").onclick = create_proxy(save_and_exit)
 js.document.getElementById("view-scores-btn").onclick = create_proxy(show_scores)
 js.document.getElementById("score-back").onclick = create_proxy(lambda e: switch_screen("menu-screen"))
+
 update_menu()
     </script>
 </body>
