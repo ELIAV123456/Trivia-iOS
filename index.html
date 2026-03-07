@@ -7,25 +7,15 @@
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <style>
-        :root { --bg: #1e1e2e; --card: #2a2a3d; --green: #4CAF50; --blue: #2196F3; --orange: #FF9800; --exit: #ff5555; --purple: #9c27b0; --gold: #ffd700; }
+        :root { --bg: #1e1e2e; --card: #2a2a3d; --green: #4CAF50; --blue: #2196F3; --orange: #FF9800; --exit: #ff5555; --purple: #9c27b0; --gold: #ffd700; --silver: #c0c0c0; --bronze: #cd7f32; }
         body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
         .container { background: var(--card); padding: 25px; border-radius: 25px; width: 85%; max-width: 450px; box-shadow: 0 15px 35px rgba(0,0,0,0.6); text-align: center; border: 1px solid #444; box-sizing: border-box; }
         .screen { display: none; flex-direction: column; }
         .active { display: flex; }
         
-        /* תיקון התיבה שלא תצא מהקווים */
         input { 
-            width: 100%; 
-            padding: 15px; 
-            margin-bottom: 10px; 
-            border-radius: 12px; 
-            border: 2px solid #444; 
-            background: #3a3a4d; 
-            color: white; 
-            text-align: center; 
-            font-size: 16px; 
-            outline: none; 
-            box-sizing: border-box; /* מבטיח שהפדינג לא מגדיל את התיבה */
+            width: 100%; padding: 15px; margin-bottom: 10px; border-radius: 12px; border: 2px solid #444; 
+            background: #3a3a4d; color: white; text-align: center; font-size: 16px; outline: none; box-sizing: border-box; 
         }
         
         button { width: 100%; padding: 16px; margin: 8px 0; border-radius: 12px; border: none; color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; box-sizing: border-box; }
@@ -38,7 +28,12 @@
         .q-card { background: #33334d; padding: 20px; border-radius: 15px; margin: 10px 0; min-height: 90px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; border: 1px solid #444; }
         #game-feedback { min-height: 30px; font-size: 18px; font-weight: bold; margin-bottom: 5px; }
         
+        /* עיצוב Rank עם מדליות */
         .my-row { background: rgba(255, 215, 0, 0.15) !important; border: 2px solid var(--gold) !important; color: var(--gold) !important; border-radius: 12px; padding: 10px; margin: 5px 0; }
+        .rank-badge { border-radius: 50%; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; margin-left: 10px; color: white; font-weight: bold; background: #444; }
+        .rank-1 { background: var(--gold); color: black; }
+        .rank-2 { background: var(--silver); color: black; }
+        .rank-3 { background: var(--bronze); color: white; }
     </style>
 </head>
 <body>
@@ -86,7 +81,7 @@
 
         <div id="score-screen" class="screen">
             <h1>🏆 לוח תוצאות</h1>
-            <div id="leaderboard-content"></div>
+            <div id="leaderboard-content" style="text-align: right;"></div>
             <button style="background:#555" id="score-back">חזרה</button>
         </div>
 
@@ -109,7 +104,7 @@ questions, idx, score, timer_val, timer_event = [], 0, 0, 15, None
 current_room_id, is_pvp, i_am_p1, game_active = None, False, False, False
 
 def play_s(sid):
-    if not game_active: return # תיקון: לא משמיע סאונד מחוץ למשחק
+    if not game_active: return
     try:
         a = js.document.getElementById(sid)
         a.currentTime = 0
@@ -132,8 +127,10 @@ async def load_q():
     try:
         res = await pyfetch(f"{DB_URL}questions.json")
         data = await res.json()
-        q_list = data['questions'] if isinstance(data, dict) and 'questions' in data else data
-        return [v for v in q_list if v]
+        if isinstance(data, dict) and 'questions' in data: q_list = data['questions']
+        elif isinstance(data, list): q_list = data
+        else: q_list = list(data.values()) if isinstance(data, dict) else []
+        return [v for v in q_list if v and isinstance(v, dict) and 'q' in v]
     except: return []
 
 async def start_normal(e=None):
@@ -143,7 +140,7 @@ async def start_normal(e=None):
     switch_screen("game-screen")
     q_all = await load_q()
     if q_all:
-        questions = random.sample(q_all, 10)
+        questions = random.sample(q_all, min(10, len(q_all)))
         next_q()
 
 async def start_pvp(e=None):
@@ -162,6 +159,9 @@ async def start_pvp(e=None):
     
     if rooms and isinstance(rooms, dict):
         for rid, rd in list(rooms.items()):
+            if rd.get("status") == "waiting" and (now - rd.get("last_pulse", 0) > 20000):
+                await pyfetch(f"{DB_URL}rooms/{rid}.json", method="DELETE")
+                continue
             if rd.get("status") == "waiting" and rd.get("player1") != u:
                 target = rid; break
     
@@ -178,7 +178,8 @@ async def start_pvp(e=None):
         q_all = await load_q()
         questions = random.sample(q_all, 10)
         await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="PUT", body=json.dumps({
-            "player1": u, "player2": "", "status": "waiting", "questions": questions, "p1_score": -1, "p2_score": -1, "last_pulse": now
+            "player1": u, "player2": "", "status": "waiting", "questions": questions, 
+            "p1_score": -1, "p2_score": -1, "last_pulse": now
         }))
         asyncio.ensure_future(wait_for_op())
 
@@ -193,6 +194,7 @@ async def wait_for_op():
                 game_active = True
                 js.document.getElementById("game-check-btn").disabled = False
                 next_q(); break
+            await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="PATCH", body=json.dumps({"last_pulse": int(js.Date.now())}))
         except: pass
 
 def next_q():
@@ -236,13 +238,33 @@ async def check_ans(e=None):
     idx += 1
     js.setTimeout(create_proxy(next_q), 1000)
 
+async def add_pts(pts):
+    u = js.localStorage.getItem("user")
+    if u and pts > 0:
+        res = await pyfetch(f"{DB_URL}users/{u}.json")
+        ud = await res.json()
+        old = ud.get('points', 0) if isinstance(ud, dict) else 0
+        new_total = old + pts
+        await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": new_total}))
+        return int(pts)
+    return 0
+
+async def handle_quit_normal(e=None):
+    global game_active
+    game_active = False
+    if timer_event: js.clearInterval(timer_event)
+    added = await add_pts(score)
+    js.alert(f"יצאת מהמשחק.\nהוספת {added} נקודות לחשבונך! 💰")
+    switch_screen("menu-screen")
+    update_menu()
+
 async def finish():
     global game_active
     game_active = False
     if timer_event: js.clearInterval(timer_event)
     if not is_pvp:
-        await add_pts(score)
-        js.alert(f"סיימת! {int(score)} נקודות")
+        added = await add_pts(score)
+        js.alert(f"המשחק הסתיים!\nצברת {int(score)} נקודות.\nהוספת {added} נקודות לחשבונך! ✨")
         switch_screen("menu-screen"); update_menu()
     else:
         switch_screen("result-screen")
@@ -273,14 +295,6 @@ async def monitor():
                 break
         except: break
 
-async def add_pts(pts):
-    u = js.localStorage.getItem("user")
-    if u and pts > 0:
-        res = await pyfetch(f"{DB_URL}users/{u}.json")
-        ud = await res.json()
-        old = ud.get('points', 0) if isinstance(ud, dict) else 0
-        await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": old + pts}))
-
 async def show_scores(e=None):
     u_me = js.localStorage.getItem("user")
     switch_screen("score-screen")
@@ -290,11 +304,14 @@ async def show_scores(e=None):
     if users:
         sorted_u = sorted(users.items(), key=lambda x: x[1].get('points', 0) if isinstance(x[1], dict) else 0, reverse=True)
         h = ""
-        for n, d in sorted_u[:10]:
+        for i, (n, d) in enumerate(sorted_u[:10]):
             is_me = (n == u_me)
             row_c = "class='my-row'" if is_me else ""
-            h += f"<div {row_c} style='padding:10px; border-bottom:1px solid #444; display:flex; justify-content:space-between;'>"
-            h += f"<span>{'⭐ ' if is_me else ''}{n}</span><span>{int(d.get('points',0))}</span></div>"
+            # בחירת קלאס המדליה
+            m_class = f"rank-{i+1}" if i < 3 else ""
+            h += f"<div {row_c} style='padding:10px; border-bottom:1px solid #444; display:flex; justify-content:space-between; align-items:center;'>"
+            h += f"<div><span class='rank-badge {m_class}'>{i+1}</span><span>{'⭐ ' if is_me else ''}{n}</span></div>"
+            h += f"<span>{int(d.get('points',0))}</span></div>"
         js.document.getElementById("leaderboard-content").innerHTML = h
 
 async def do_auth(e=None):
@@ -307,12 +324,11 @@ async def do_auth(e=None):
         data = await res.json()
         if data and data.get("password") == h_p:
             js.localStorage.setItem("user", u); update_menu(); switch_screen("menu-screen")
-        else: js.alert("טעות")
+        else: js.alert("פרטים שגויים")
     else:
         await pyfetch(f"{DB_URL}users/{u}.json", method="PUT", body=json.dumps({"password": h_p, "points": 0}))
         js.localStorage.setItem("user", u); update_menu(); switch_screen("menu-screen")
 
-# --- Event Listeners עם תיקון לשגיאת ה-TypeError ---
 def run_coro(coro_func):
     return create_proxy(lambda e: asyncio.ensure_future(coro_func(e)))
 
@@ -321,9 +337,7 @@ js.document.getElementById("start-pvp-btn").onclick = run_coro(start_pvp)
 js.document.getElementById("game-check-btn").onclick = run_coro(check_ans)
 js.document.getElementById("view-scores-btn").onclick = run_coro(show_scores)
 js.document.getElementById("auth-submit").onclick = run_coro(do_auth)
-
-# פונקציות שאינן Coroutine (סינכרוניות) לא צריכות ensure_future
-js.document.getElementById("game-quit-btn").onclick = create_proxy(lambda e: (asyncio.ensure_future(add_pts(score)), switch_screen("menu-screen")))
+js.document.getElementById("game-quit-btn").onclick = run_coro(handle_quit_normal)
 js.document.getElementById("force-quit-btn").onclick = create_proxy(lambda e: switch_screen("menu-screen"))
 js.document.getElementById("back-to-menu-btn").onclick = create_proxy(lambda e: (update_menu(), switch_screen("menu-screen")))
 js.document.getElementById("score-back").onclick = create_proxy(lambda e: switch_screen("menu-screen"))
