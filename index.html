@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Trivia Master V2 Fixed</title>
+    <title>Trivia Master V1.0 - Fixed</title>
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <style>
@@ -11,7 +11,7 @@
         body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; transition: 0.3s; }
         .container { background: var(--card); padding: 25px; border-radius: 25px; width: 90%; max-width: 450px; min-height: 550px; box-shadow: 0 15px 35px rgba(0,0,0,0.6); text-align: center; border: 1px solid #444; position: relative; display: flex; flex-direction: column; }
         
-        /* גלגלת הגדרות - צד שמאל למעלה, מוסתרת כברירת מחדל */
+        /* גלגלת הגדרות - צד שמאל למעלה */
         .settings-btn { position: absolute; top: 20px; left: 20px; background: none; border: none; font-size: 28px; cursor: pointer; z-index: 1000; display: none; }
 
         .screen { display: none; flex-direction: column; flex-grow: 1; justify-content: center; }
@@ -25,7 +25,6 @@
         input { width: 100%; padding: 15px; margin-bottom: 15px; border-radius: 12px; border: 2px solid #444; background: #3a3a4d; color: white; text-align: center; font-size: 18px; box-sizing: border-box; }
         
         .q-card { background: #33334d; padding: 20px; border-radius: 15px; margin: 15px 0; font-size: 22px; font-weight: bold; border: 1px solid #444; min-height: 80px; display: flex; align-items: center; justify-content: center; }
-        
         .score-row { display: flex; justify-content: space-between; padding: 12px; border-radius: 8px; margin-bottom: 4px; background: rgba(255,255,255,0.05); align-items: center; }
     </style>
 </head>
@@ -49,9 +48,12 @@
         </div>
 
         <div id="game-screen" class="screen">
-            <div style="display:flex; justify-content:space-between;"><span id="q-count">1/10</span><span id="q-timer" style="color:var(--orange)">⏱️ 15</span></div>
-            <div class="q-card" id="q-text">טוען...</div>
-            <input type="text" id="ans-input" placeholder="הקלד תשובה...">
+            <div style="display:flex; justify-content:space-between;">
+                <span id="q-count">1/10</span>
+                <span id="q-timer" style="color:var(--orange)">⏱️ 15</span>
+            </div>
+            <div class="q-card" id="q-text">טוען שאלה...</div>
+            <input type="text" id="ans-input" placeholder="הקלד תשובה כאן...">
             <button class="btn-green" id="submit-ans">שלח תשובה</button>
             <button id="exit-game" class="btn-exit" style="background:#444">❌ יציאה</button>
         </div>
@@ -63,9 +65,9 @@
         </div>
 
         <div id="settings-screen" class="screen">
-            <h2>הגדרות</h2>
+            <h2>הגדרות פרופיל</h2>
             <input type="text" id="new-username" placeholder="שם חדש">
-            <div id="emoji-picker" style="display:grid; grid-template-columns: repeat(5,1fr); gap:5px; margin:10px 0;"></div>
+            <div id="emoji-picker" style="display:grid; grid-template-columns: repeat(5,1fr); gap:10px; margin:15px 0;"></div>
             <button class="btn-green" id="save-profile">שמור</button>
             <button style="background:#555" id="settings-back">ביטול</button>
         </div>
@@ -76,13 +78,6 @@
             <input type="password" id="auth-pass" placeholder="סיסמה">
             <button class="btn-green" id="auth-submit">אישור</button>
             <button style="background:#555" id="auth-back">חזרה</button>
-        </div>
-
-        <div id="lobby-screen" class="screen">
-            <h2>⚔️ לובי PVP</h2>
-            <div id="lobby-list"></div>
-            <button class="btn-purple" id="create-room">צור חדר</button>
-            <button style="background:#555" id="lobby-back">חזרה</button>
         </div>
     </div>
 
@@ -96,7 +91,6 @@ questions, cur_idx, cur_score, timer_val, t_task = [], 0, 0, 15, None
 EMOJIS = ["🦁","🥷","🤖","🦄","🐯","🐸","🐱","🐶","🦊","🐼"]
 
 def switch(sid):
-    # הגלגלת מופיעה רק בתפריט הראשי
     js.document.getElementById("gear-btn").style.display = "block" if sid == "menu-screen" else "none"
     for s in js.document.querySelectorAll(".screen"): s.classList.remove("active")
     js.document.getElementById(sid).classList.add("active")
@@ -145,15 +139,14 @@ async def check_user_answer(e=None):
     global cur_idx, cur_score, t_task
     if t_task: js.clearInterval(t_task)
     
-    # בדיקת תשובה - ניקוי רווחים והשוואת טקסט
     u_ans = str(js.document.getElementById("ans-input").value).strip().lower()
     c_ans = str(questions[cur_idx]['a']).strip().lower()
     
     if u_ans == c_ans and u_ans != "":
         cur_score += 1
-        js.document.body.style.background = "#2e7d32" # ירוק
+        js.document.body.style.background = "#2e7d32"
     else:
-        js.document.body.style.background = "#c62828" # אדום
+        js.document.body.style.background = "#c62828"
         
     js.setTimeout(create_proxy(lambda: setattr(js.document.body.style, 'background', '#1e1e2e')), 500)
     cur_idx += 1
@@ -162,10 +155,10 @@ async def check_user_answer(e=None):
 async def end_game():
     u = js.localStorage.getItem("user")
     res = await pyfetch(f"{DB}users/{u}.json")
-    userData = await res.json()
-    newPoints = (userData.get("points", 0) if userData else 0) + cur_score
-    await pyfetch(f"{DB}users/{u}.json", method="PATCH", body=json.dumps({"points": newPoints}))
-    js.alert(f"המשחק הסתיים! 🎉\nצברת {cur_score} נקודות.")
+    d = await res.json()
+    new_p = (d.get("points", 0) if d else 0) + cur_score
+    await pyfetch(f"{DB}users/{u}.json", method="PATCH", body=json.dumps({"points": new_p}))
+    js.alert(f"סיימת! 🎉 צברת {cur_score} נקודות מתוך {len(questions)}.")
     update_ui()
 
 async def show_leaderboard(e=None):
@@ -202,7 +195,6 @@ def open_settings(e=None):
         grid.appendChild(span)
     switch("settings-screen")
 
-# חיווט אירועים - יציב (create_proxy)
 js.document.getElementById("go-login").onclick = create_proxy(lambda e: (setattr(js.document.getElementById("auth-title"), "innerText", "כניסה"), switch("auth-screen")))
 js.document.getElementById("go-reg").onclick = create_proxy(lambda e: (setattr(js.document.getElementById("auth-title"), "innerText", "הרשמה"), switch("auth-screen")))
 js.document.getElementById("play-solo").onclick = create_proxy(start_solo)
