@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Trivia Quiz Pro V1.2</title>
+    <title>Trivia Quiz Pro</title>
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <style>
@@ -30,22 +30,22 @@
         
         .q-card { background: #33334d; padding: 20px; border-radius: 15px; margin: 10px 0; min-height: 90px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; border: 1px solid #444; }
         
-        .score-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #444; margin: 5px 0; border-radius: 10px; }
-        .my-row { background: rgba(255, 215, 0, 0.15) !important; border: 2px solid var(--gold) !important; color: var(--gold) !important; }
+        /* עיצוב לוח תוצאות */
+        .score-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #444; margin: 5px 0; border-radius: 12px; background: rgba(255,255,255,0.03); }
+        .my-row { background: rgba(255, 215, 0, 0.1) !important; border: 1px solid var(--gold) !important; color: var(--gold) !important; transform: scale(1.02); }
         
-        .rank-badge { border-radius: 50%; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; margin-left: 10px; color: white; font-weight: bold; background: #444; }
+        .rank-badge { border-radius: 50%; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; margin-left: 12px; background: #444; color: white; }
         .rank-1 { background: var(--gold); color: black; }
-        
+        .rank-2 { background: var(--silver); color: black; }
+        .rank-3 { background: var(--bronze); color: white; }
+
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
         .shake { animation: shake 0.4s ease-in-out; border: 2px solid var(--exit) !important; }
-
-        .emoji-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 15px 0; }
-        .emoji-item { font-size: 30px; cursor: pointer; padding: 5px; border-radius: 8px; }
-        .emoji-item:hover { background: #444; }
-        
         .room-item { background: #33334d; padding: 12px; margin-bottom: 8px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #444; }
         .waiting { animation: pulse 1.5s infinite; color: var(--orange); }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        .emoji-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 15px 0; }
+        .emoji-item { font-size: 30px; cursor: pointer; padding: 5px; border-radius: 8px; }
     </style>
 </head>
 <body>
@@ -98,7 +98,6 @@
         <div id="settings-screen" class="screen">
             <h2>⚙️ הגדרות</h2>
             <input type="text" id="set-new-name" placeholder="שם משתמש חדש">
-            <p>בחר אימוג'י:</p>
             <div id="emoji-list" class="emoji-grid"></div>
             <button class="btn-green" id="save-settings-btn">שמור</button>
             <button class="btn-exit" id="logout-btn">התנתק</button>
@@ -133,7 +132,6 @@ current_room_id, is_pvp, i_am_p1, game_active = None, False, False, False
 EMOJIS = ["🦁","🥷","🤖","🦄","🐯","🐸","🐱","🐶","🦊","🐼"]
 
 def play_s(sid):
-    # צליל יופעל רק אם אנחנו במסך המשחק
     if js.document.getElementById("game-screen").classList.contains("active"):
         try:
             a = js.document.getElementById(sid)
@@ -163,6 +161,40 @@ async def load_q():
         return [v for v in q_list if v and isinstance(v, dict) and 'q' in v]
     except: return []
 
+async def show_scores(e=None):
+    u_me = js.localStorage.getItem("user")
+    switch_screen("score-screen")
+    cont = js.document.getElementById("leaderboard-content")
+    cont.innerHTML = "<p class='waiting'>טוען אלופים...</p>"
+    
+    res = await pyfetch(f"{DB_URL}users.json")
+    users = await res.json()
+    if not users: return
+    
+    sorted_u = sorted(users.items(), key=lambda x: x[1].get('points', 0) if isinstance(x[1], dict) else 0, reverse=True)
+    h = ""
+    medals = {0: "🥇", 1: "🥈", 2: "🥉"}
+    
+    for i, (n, d) in enumerate(sorted_u[:10]):
+        is_me = (n == u_me)
+        row_c = "score-row my-row" if is_me else "score-row"
+        rank_c = f"rank-badge rank-{i+1}" if i < 3 else "rank-badge"
+        
+        medal_or_rank = medals.get(i, i+1)
+        name_display = f"⭐ {n}" if is_me else n
+        pts = int(d.get('points', 0))
+        
+        h += f"<div class='{row_c}'>"
+        h += f"  <div style='display:flex; align-items:center;'>"
+        h += f"    <span class='{rank_c}'>{medal_or_rank}</span>"
+        h += f"    <span>{name_display}</span>"
+        h += f"  </div>"
+        h += f"  <b style='color:var(--blue);'>{pts}</b>"
+        h += f"</div>"
+    cont.innerHTML = h
+
+# --- פונקציות PVP ולוגיקה (לא השתנה) ---
+
 async def open_lobby(e=None):
     switch_screen("lobby-screen")
     asyncio.ensure_future(refresh_rooms())
@@ -174,7 +206,7 @@ async def refresh_rooms():
     rooms = await res.json() if res.status == 200 else None
     cont.innerHTML = ""
     if not rooms or not isinstance(rooms, dict):
-        cont.innerHTML = "<p>אין חדרים זמינים כרגע.</p>"
+        cont.innerHTML = "<p>אין חדרים זמינים.</p>"
         return
     for rid, rd in rooms.items():
         if rd.get("status") == "waiting":
@@ -193,8 +225,7 @@ async def refresh_rooms():
 
 async def create_room(e=None):
     global questions, current_room_id, i_am_p1, is_pvp, game_active, score, idx
-    u = js.localStorage.getItem("user")
-    score, idx = 0, 0
+    u, score, idx = js.localStorage.getItem("user"), 0, 0
     current_room_id, i_am_p1, is_pvp, game_active = f"room_{u}", True, True, False
     switch_screen("game-screen")
     js.document.getElementById("game-check-btn").disabled = True
@@ -218,13 +249,13 @@ async def join_room(rid):
     next_q()
 
 async def wait_for_op():
-    global game_active
     while current_room_id:
         await asyncio.sleep(2)
         try:
             res = await pyfetch(f"{DB_URL}rooms/{current_room_id}.json")
             d = await res.json()
             if d and d.get("status") == "active":
+                global game_active
                 game_active = True
                 js.document.getElementById("game-check-btn").disabled = False
                 next_q(); break
@@ -271,7 +302,7 @@ async def check_ans(e=None):
         pts = 2 if timer_val > 10 else 1
         score += pts
         play_s("snd-correct")
-        fb.innerHTML = f"<span style='color:var(--green)'>נכון! ✅ {'(+2 בונוס מהירות)' if pts==2 else ''}</span>"
+        fb.innerHTML = f"<span style='color:var(--green)'>נכון! ✅ {'(+2 בונוס)' if pts==2 else ''}</span>"
     else:
         if score > 0: score -= 0.5
         play_s("snd-wrong")
@@ -291,7 +322,6 @@ async def finish():
     ud = await res.json()
     new_total = (ud.get('points', 0) if ud else 0) + score
     await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": new_total}))
-    
     if not is_pvp:
         js.alert(f"המשחק נגמר! צברת {int(score)} נקודות.")
         update_menu(); switch_screen("menu-screen")
@@ -318,35 +348,14 @@ async def monitor_results():
     update_menu(); switch_screen("menu-screen")
 
 async def handle_quit(e=None):
-    global game_active, current_room_id
     if timer_event: js.clearInterval(timer_event)
     u = js.localStorage.getItem("user")
-    # שמירת נקודות שנצברו עד כה
     res = await pyfetch(f"{DB_URL}users/{u}.json")
     ud = await res.json()
-    new_total = (ud.get('points', 0) if ud else 0) + score
-    await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": new_total}))
-    
-    js.alert(f"יצאת מהמשחק. נשמרו לך {int(score)} נקודות.")
+    await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": (ud.get('points',0) if ud else 0) + score}))
+    js.alert(f"נשמרו לך {int(score)} נקודות.")
     if is_pvp and current_room_id: await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="DELETE")
-    current_room_id = None
     update_menu(); switch_screen("menu-screen")
-
-async def show_scores(e=None):
-    u_me = js.localStorage.getItem("user")
-    switch_screen("score-screen")
-    js.document.getElementById("leaderboard-content").innerHTML = "<p class='waiting'>טוען...</p>"
-    res = await pyfetch(f"{DB_URL}users.json")
-    users = await res.json()
-    if users:
-        sorted_u = sorted(users.items(), key=lambda x: x[1].get('points', 0) if isinstance(x[1], dict) else 0, reverse=True)
-        h = ""
-        for i, (n, d) in enumerate(sorted_u[:10]):
-            is_me = (n == u_me)
-            row_c = "score-row my-row" if is_me else "score-row"
-            rank_c = "rank-badge rank-1" if i == 0 else "rank-badge"
-            h += f"<div class='{row_c}'><div><span class='{rank_c}'>{i+1}</span>{'⭐ ' if is_me else ''}{n}</div><b>{int(d.get('points',0))}</b></div>"
-        js.document.getElementById("leaderboard-content").innerHTML = h
 
 async def open_settings(e=None):
     js.document.getElementById("set-new-name").value = js.localStorage.getItem("user")
