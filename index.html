@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Trivia Quiz V2.1</title>
+    <title>Trivia Quiz V2.2</title>
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <style>
@@ -14,18 +14,17 @@
         .active { display: flex; }
         input { width: 100%; padding: 15px; margin-bottom: 10px; border-radius: 12px; border: 2px solid #444; background: #3a3a4d; color: white; text-align: center; font-size: 16px; outline: none; }
         button { width: 100%; padding: 16px; margin: 8px 0; border-radius: 12px; border: none; color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:disabled { background: #555 !important; cursor: not-allowed; opacity: 0.6; }
         .btn-green { background: var(--green); }
         .btn-purple { background: var(--purple); }
         .btn-exit { background: var(--exit); }
         .room-item { background: #33334d; padding: 15px; border-radius: 15px; margin: 8px 0; display: flex; justify-content: space-between; align-items: center; border: 1px solid #555; }
         .q-card { background: #33334d; padding: 20px; border-radius: 15px; margin: 10px 0; min-height: 90px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; border: 1px solid #444; }
         
-        /* תיקון גלגל שיניים */
-        .settings-btn { position: absolute; top: 20px; left: 20px; background: none; border: none; font-size: 24px; cursor: pointer; display: none; z-index: 10; }
+        .settings-btn { position: absolute; top: 20px; left: 20px; background: none; border: none; font-size: 26px; cursor: pointer; display: none; z-index: 10; }
         
-        /* עיצוב בחירת אימוג'י */
-        .emoji-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin: 15px 0; }
-        .emoji-opt { font-size: 24px; cursor: pointer; padding: 5px; border-radius: 10px; border: 2px solid transparent; transition: 0.2s; }
+        .emoji-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 15px 0; }
+        .emoji-opt { font-size: 24px; cursor: pointer; padding: 5px; border-radius: 10px; border: 2px solid transparent; }
         .emoji-active { border-color: var(--blue); background: rgba(33, 150, 243, 0.2); }
         
         .loader { width: 20px; height: 20px; border: 3px solid #FFF; border-bottom-color: transparent; border-radius: 50%; display: inline-block; animation: rotation 1s linear infinite; margin-right: 10px; }
@@ -59,9 +58,8 @@
 
         <div id="settings-screen" class="screen">
             <h2>הגדרות פרופיל</h2>
-            <input type="text" id="set-name" placeholder="שם חדש (השאר ריק ללא שינוי)">
-            <div class="emoji-grid" id="emoji-container">
-                </div>
+            <input type="text" id="set-name" placeholder="שם חדש">
+            <div class="emoji-grid" id="emoji-container"></div>
             <button class="btn-green" id="save-settings">שמור שינויים</button>
             <button style="background:#555" id="settings-back">ביטול</button>
         </div>
@@ -74,6 +72,7 @@
             <div class="q-card" id="q-text">טוען...</div>
             <input type="text" id="game-ans" placeholder="הקלד תשובה...">
             <button class="btn-green" id="game-submit">שלח תשובה</button>
+            <button id="cancel-room-btn" class="btn-exit" style="display:none; margin-top:5px; background:#666;">ביטול ויציאה מהחדר</button>
         </div>
     </div>
 
@@ -86,24 +85,28 @@ DB_URL = "https://triviaquizapp-8b15c-default-rtdb.firebaseio.com/"
 questions, idx, score, timer_val, timer_event = [], 0, 0, 15, None
 current_room_id, is_pvp, i_am_p1, game_active, lobby_loop = None, False, False, False, None
 selected_emoji = js.localStorage.getItem("emoji") or "👤"
-
-# רשימת 24 אימוג'ים
-EMOJI_LIST = ["🦁","🥷","🤖","🦄","🐯","🐸","🐱","🐶","🦊","🐼","🐨","🐝","🎨","🚀","🎸","🍕","⚽","🎮","👑","🔥","💎","👻","👾","😎"]
+EMOJIS = ["🦁","🥷","🤖","🦄","🐯","🐸","🐱","🐶","🦊","🐼","🐨","🐝","🎨","🚀","🎸","🍕","⚽","🎮","👑","🔥","💎","👻","👾","😎"]
 
 def build_emoji_picker():
     cont = js.document.getElementById("emoji-container")
     cont.innerHTML = ""
-    for em in EMOJI_LIST:
+    for em in EMOJIS:
         span = js.document.createElement("span")
-        span.className = "emoji-opt"
-        if em == selected_emoji: span.classList.add("emoji-active")
+        span.className = "emoji-opt" + (" emoji-active" if em == selected_emoji else "")
         span.innerText = em
-        span.onclick = create_proxy(pick_emoji)
+        span.onclick = create_proxy(lambda e, val=em: pick_emoji(val))
         cont.appendChild(span)
+
+def pick_emoji(val):
+    global selected_emoji
+    selected_emoji = val
+    build_emoji_picker()
 
 def switch_screen(sid):
     global lobby_loop
-    js.document.getElementById("settings-open").style.display = "block" if sid in ["menu-screen", "lobby-screen"] else "none"
+    # הצגת הגדרות רק בתפריט הראשי
+    js.document.getElementById("settings-open").style.display = "block" if sid == "menu-screen" else "none"
+    
     if sid != "lobby-screen" and lobby_loop:
         js.clearInterval(lobby_loop)
         lobby_loop = None
@@ -118,14 +121,6 @@ def update_menu():
     js.document.getElementById("logged-out-ui").style.display = "none" if u else "block"
     switch_screen("menu-screen")
 
-async def save_points(pts):
-    u = js.localStorage.getItem("user")
-    if not u: return
-    res = await pyfetch(f"{DB_URL}users/{u}.json")
-    data = await res.json()
-    old_pts = data.get("points", 0) if data else 0
-    await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": old_pts + pts}))
-
 async def load_questions():
     try:
         res = await pyfetch(f"{DB_URL}questions.json")
@@ -135,45 +130,36 @@ async def load_questions():
         return []
     except: return []
 
-async def refresh_lobby():
-    js.document.getElementById("lobby-loader").style.display = "inline-block"
-    try:
-        res = await pyfetch(f"{DB_URL}rooms.json")
-        rooms = await res.json() if res.status == 200 else {}
-        container = js.document.getElementById("rooms-list")
-        container.innerHTML = ""
-        now = int(js.Date.now())
-        if rooms and isinstance(rooms, dict):
-            for rid, rd in rooms.items():
-                # ניקוי חדרים ישנים (מעל דקה ללא דופק)
-                if now - rd.get("last_pulse", 0) > 60000:
-                    await pyfetch(f"{DB_URL}rooms/{rid}.json", method="DELETE")
-                    continue
-                if rd.get("status") == "waiting":
-                    div = js.document.createElement("div")
-                    div.className = "room-item"
-                    div.innerHTML = f"<span>{rd.get('p1_emoji','👤')} <b>{rd.get('player1')}</b></span><button style='width:auto; padding:5px 15px; background:var(--blue)'>הכנס</button>"
-                    div.onclick = create_proxy(lambda e, r=rid: asyncio.ensure_future(join_room(r)))
-                    container.appendChild(div)
-        if not container.innerHTML: container.innerHTML = "<p style='color:#777'>אין חדרים פתוחים...</p>"
-    finally:
-        js.document.getElementById("lobby-loader").style.display = "none"
+async def cancel_and_exit(e=None):
+    global current_room_id, game_active
+    if current_room_id and i_am_p1:
+        await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="DELETE")
+    current_room_id = None
+    game_active = False
+    update_menu()
 
 async def create_room(e=None):
     global current_room_id, i_am_p1, questions, is_pvp, game_active
     u = js.localStorage.getItem("user")
     em = js.localStorage.getItem("emoji") or "👤"
     all_q = await load_questions()
-    if not all_q: return js.alert("שגיאה בטעינת שאלות")
+    if not all_q: return
+    
     is_pvp, i_am_p1, game_active = True, True, False
     questions = random.sample(all_q, min(10, len(all_q)))
     current_room_id = f"room_{int(js.Date.now())}"
+    
     await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="PUT", body=json.dumps({
         "player1": u, "p1_emoji": em, "status": "waiting", "questions": questions,
         "p1_score": -1, "p2_score": -1, "last_pulse": int(js.Date.now())
     }))
+    
     switch_screen("game-screen")
-    js.document.getElementById("q-text").innerText = "ממתין ליריב..."
+    js.document.getElementById("q-text").innerText = "ממתין ליריב שיצטרף..."
+    # חוסם כפתור ומציג ביטול
+    js.document.getElementById("game-submit").disabled = True
+    js.document.getElementById("cancel-room-btn").style.display = "block"
+    
     asyncio.ensure_future(wait_loop())
 
 async def join_room(rid):
@@ -181,24 +167,27 @@ async def join_room(rid):
     u = js.localStorage.getItem("user")
     em = js.localStorage.getItem("emoji") or "👤"
     await pyfetch(f"{DB_URL}rooms/{rid}.json", method="PATCH", body=json.dumps({
-        "player2": u, "p2_emoji": em, "status": "active", "last_pulse": int(js.Date.now())
+        "player2": u, "p2_emoji": em, "status": "active"
     }))
     d = await (await pyfetch(f"{DB_URL}rooms/{rid}.json")).json()
     questions, current_room_id, i_am_p1, is_pvp, game_active = d['questions'], rid, False, True, True
     switch_screen("game-screen")
+    js.document.getElementById("game-submit").disabled = False
+    js.document.getElementById("cancel-room-btn").style.display = "none"
     start_quiz()
 
 async def wait_loop():
     global game_active
     while not game_active and current_room_id:
         await asyncio.sleep(2)
-        d = await (await pyfetch(f"{DB_URL}rooms/{current_room_id}.json")).json()
+        res = await pyfetch(f"{DB_URL}rooms/{current_room_id}.json")
+        d = await res.json()
         if d and d.get("status") == "active":
             game_active = True
+            js.document.getElementById("game-submit").disabled = False
+            js.document.getElementById("cancel-room-btn").style.display = "none"
             start_quiz()
-        else:
-            # עדכון דופק בזמן המתנה
-            await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="PATCH", body=json.dumps({"last_pulse": int(js.Date.now())}))
+        elif not d: break # חדר נמחק
 
 def start_quiz():
     global idx, score
@@ -216,6 +205,16 @@ def show_q():
     timer_val = 15
     if timer_event: js.clearInterval(timer_event)
     timer_event = js.setInterval(create_proxy(lambda: asyncio.ensure_future(timer_tick())), 1000)
+
+async def finish_game():
+    u = js.localStorage.getItem("user")
+    if u:
+        r = await pyfetch(f"{DB_URL}users/{u}.json")
+        d = await r.json()
+        p = (d.get("points", 0) if d else 0) + score
+        await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": p}))
+    js.alert(f"הסתיים! צברת {score} נקודות.")
+    update_menu()
 
 async def timer_tick():
     global timer_val
@@ -236,46 +235,39 @@ async def check_ans(e=None):
     idx += 1
     show_q()
 
-async def finish_game():
-    global current_room_id
-    await save_points(score)
-    if is_pvp:
-        field = "p1_score" if i_am_p1 else "p2_score"
-        await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="PATCH", body=json.dumps({field: score}))
-        js.alert(f"המשחק נגמר! הניקוד שלך ({score}) נשמר.")
-    else:
-        js.alert(f"המשחק נגמר! צברת {score} נקודות.")
-    switch_screen("menu-screen")
-
-async def save_settings(e=None):
-    global selected_emoji
-    u_new = js.document.getElementById("set-name").value.strip()
-    if u_new: js.localStorage.setItem("user", u_new)
-    js.localStorage.setItem("emoji", selected_emoji)
-    update_menu()
-
-def pick_emoji(e):
-    global selected_emoji
-    selected_emoji = e.target.innerText
-    for opt in js.document.querySelectorAll(".emoji-opt"): opt.classList.remove("emoji-active")
-    e.target.classList.add("emoji-active")
-
 async def open_lobby(e=None):
     global lobby_loop
     switch_screen("lobby-screen")
     await refresh_lobby()
     lobby_loop = js.setInterval(create_proxy(lambda: asyncio.ensure_future(refresh_lobby())), 4000)
 
-# חיווט
+async def refresh_lobby():
+    js.document.getElementById("lobby-loader").style.display = "inline-block"
+    res = await pyfetch(f"{DB_URL}rooms.json")
+    rooms = await res.json() if res.status == 200 else {}
+    container = js.document.getElementById("rooms-list")
+    container.innerHTML = ""
+    if rooms and isinstance(rooms, dict):
+        for rid, rd in rooms.items():
+            if rd.get("status") == "waiting":
+                div = js.document.createElement("div")
+                div.className = "room-item"
+                div.innerHTML = f"<span>{rd.get('p1_emoji','👤')} <b>{rd.get('player1')}</b></span><button style='width:auto; padding:5px 15px; background:var(--blue)'>הכנס</button>"
+                div.onclick = create_proxy(lambda e, r=rid: asyncio.ensure_future(join_room(r)))
+                container.appendChild(div)
+    js.document.getElementById("lobby-loader").style.display = "none"
+
+# חיווט כפתורים
 js.document.getElementById("go-lobby-btn").onclick = lambda e: asyncio.ensure_future(open_lobby())
 js.document.getElementById("create-room-btn").onclick = lambda e: asyncio.ensure_future(create_room())
+js.document.getElementById("cancel-room-btn").onclick = lambda e: asyncio.ensure_future(cancel_and_exit())
 js.document.getElementById("settings-open").onclick = lambda e: (build_emoji_picker(), switch_screen("settings-screen"))
-js.document.getElementById("save-settings").onclick = lambda e: asyncio.ensure_future(save_settings())
+js.document.getElementById("save-settings").onclick = lambda e: (js.localStorage.setItem("emoji", selected_emoji), js.localStorage.setItem("user", js.document.getElementById("set-name").value or js.localStorage.getItem("user")), update_menu())
 js.document.getElementById("game-submit").onclick = lambda e: asyncio.ensure_future(check_ans())
-js.document.getElementById("settings-back").onclick = lambda e: switch_screen("menu-screen")
-js.document.getElementById("lobby-back").onclick = lambda e: switch_screen("menu-screen")
+js.document.getElementById("settings-back").onclick = lambda e: update_menu()
+js.document.getElementById("lobby-back").onclick = lambda e: update_menu()
 js.document.getElementById("logout-btn").onclick = lambda e: (js.localStorage.removeItem("user"), update_menu())
-js.document.getElementById("start-normal-btn").onclick = lambda e: asyncio.ensure_future(create_room()) # משחק רגיל כרגע משתמש באותה לוגיקה ללא יריב
+js.document.getElementById("start-normal-btn").onclick = lambda e: asyncio.ensure_future(create_room())
 
 update_menu()
     </script>
