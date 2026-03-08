@@ -7,12 +7,11 @@
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <style>
-        :root { --bg: #1e1e2e; --card: #2a2a3d; --green: #4CAF50; --blue: #2196F3; --orange: #FF9800; --exit: #ff5555; --purple: #9c27b0; --gold: #ffd700; }
+        :root { --bg: #1e1e2e; --card: #2a2a3d; --green: #4CAF50; --blue: #2196F3; --orange: #FF9800; --exit: #ff5555; --purple: #9c27b0; --gold: #ffd700; --silver: #c0c0c0; --bronze: #cd7f32; }
         body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; transition: 0.3s; }
-        
         .container { background: var(--card); padding: 25px; border-radius: 25px; width: 90%; max-width: 450px; min-height: 550px; box-shadow: 0 15px 35px rgba(0,0,0,0.6); text-align: center; border: 1px solid #444; position: relative; display: flex; flex-direction: column; }
 
-        /* גלגלת הגדרות - צד שמאל למעלה */
+        /* גלגלת בצד שמאל רק בתפריט */
         .settings-btn { position: absolute; top: 20px; left: 20px; background: none; border: none; font-size: 28px; cursor: pointer; z-index: 1000; display: none; }
 
         .screen { display: none; flex-direction: column; flex-grow: 1; justify-content: center; }
@@ -24,11 +23,14 @@
         .btn-exit { background: var(--exit); }
 
         input { width: 100%; padding: 15px; margin-bottom: 15px; border-radius: 12px; border: 2px solid #444; background: #3a3a4d; color: white; text-align: center; font-size: 18px; box-sizing: border-box; }
-        input:focus { border-color: var(--blue); outline: none; }
-
+        
         .q-card { background: #33334d; padding: 20px; border-radius: 15px; margin: 15px 0; font-size: 22px; font-weight: bold; border: 1px solid #444; min-height: 80px; display: flex; align-items: center; justify-content: center; }
         
+        /* לוח תוצאות V2 */
         .score-row { display: flex; justify-content: space-between; padding: 12px; border-radius: 8px; margin-bottom: 4px; background: rgba(255,255,255,0.05); align-items: center; }
+        .rank-1 { border: 2px solid var(--gold); }
+        .rank-2 { border: 2px solid var(--silver); }
+        .rank-3 { border: 2px solid var(--bronze); }
     </style>
 </head>
 <body>
@@ -37,7 +39,7 @@
 
         <div id="menu-screen" class="screen active">
             <h1>🎮 Trivia Master</h1>
-            <p id="user-display" style="color:var(--blue); font-weight:bold; font-size: 1.2em;"></p>
+            <p id="user-display" style="color:var(--blue); font-weight:bold;"></p>
             <div id="auth-btns">
                 <button class="btn-green" id="go-login">כניסה</button>
                 <button style="background:var(--blue)" id="go-reg">הרשמה</button>
@@ -51,26 +53,23 @@
         </div>
 
         <div id="game-screen" class="screen">
-            <div style="display:flex; justify-content:space-between;">
-                <span id="q-count">1/10</span>
-                <span id="q-timer" style="color:var(--orange)">⏱️ 15</span>
-            </div>
-            <div class="q-card" id="q-text">טוען שאלה...</div>
-            <input type="text" id="ans-input" placeholder="הקלד תשובה כאן...">
+            <div style="display:flex; justify-content:space-between;"><span id="q-count">1/10</span><span id="q-timer" style="color:var(--orange)">⏱️ 15</span></div>
+            <div class="q-card" id="q-text">טוען...</div>
+            <input type="text" id="ans-input" placeholder="הקלד תשובה...">
             <button class="btn-green" id="submit-ans">שלח תשובה</button>
             <button id="exit-game" class="btn-exit" style="background:#444">❌ יציאה</button>
         </div>
 
         <div id="score-screen" class="screen">
             <h2>🏆 טבלת אלופים</h2>
-            <div id="leaderboard-cont" style="max-height: 300px; overflow-y: auto;"></div>
+            <div id="leaderboard-cont"></div>
             <button style="background:#555" id="score-back">חזרה</button>
         </div>
 
         <div id="settings-screen" class="screen">
-            <h2>הגדרות פרופיל</h2>
-            <input type="text" id="new-username" placeholder="שם משתמש חדש">
-            <div id="emoji-picker" style="display:grid; grid-template-columns: repeat(6,1fr); gap:8px; margin:10px 0;"></div>
+            <h2>הגדרות</h2>
+            <input type="text" id="new-username" placeholder="שם חדש">
+            <div id="emoji-picker" style="display:grid; grid-template-columns: repeat(5,1fr); gap:5px;"></div>
             <button class="btn-green" id="save-profile">שמור</button>
             <button style="background:#555" id="settings-back">ביטול</button>
         </div>
@@ -82,11 +81,11 @@
             <button class="btn-green" id="auth-submit">אישור</button>
             <button style="background:#555" id="auth-back">חזרה</button>
         </div>
-        
+
         <div id="lobby-screen" class="screen">
-            <h2 style="color:var(--purple)">⚔️ לובי PVP</h2>
-            <div id="lobby-list" style="max-height: 280px; overflow-y: auto; margin-bottom: 10px;"></div>
-            <button class="btn-purple" id="create-room">➕ צור חדר חדש</button>
+            <h2>⚔️ לובי PVP</h2>
+            <div id="lobby-list"></div>
+            <button class="btn-purple" id="create-room">צור חדר</button>
             <button style="background:#555" id="lobby-back">חזרה</button>
         </div>
     </div>
@@ -98,11 +97,10 @@ from pyodide.ffi import create_proxy
 
 DB = "https://triviaquizapp-8b15c-default-rtdb.firebaseio.com/"
 questions, cur_idx, cur_score, timer_val, t_task = [], 0, 0, 15, None
-room_id, is_pvp, am_p1, game_active = None, False, False, False
-EMOJIS = ["🦁","🥷","🤖","🦄","🐯","🐸","🐱","🐶","🦊","🐼","🐨","🐝","🚀","🎸","🍕","⚽","🎮","👑","🔥","💎"]
+EMOJIS = ["🦁","🥷","🤖","🦄","🐯","🐸","🐱","🐶","🦊","🐼"]
 
 def switch(sid):
-    # הצגת הגלגלת רק בתפריט הראשי
+    # גלגלת מופיעה רק בתפריט
     js.document.getElementById("gear-btn").style.display = "block" if sid == "menu-screen" else "none"
     for s in js.document.querySelectorAll(".screen"): s.classList.remove("active")
     js.document.getElementById(sid).classList.add("active")
@@ -116,18 +114,15 @@ def update_ui(e=None):
     switch("menu-screen")
 
 async def get_all_q():
-    try:
-        res = await pyfetch(f"{DB}questions.json")
-        d = await res.json()
-        return d if isinstance(d, list) else list(d.values())
-    except: return []
+    res = await pyfetch(f"{DB}questions.json")
+    d = await res.json()
+    return d if isinstance(d, list) else list(d.values())
 
 async def start_solo(e=None):
-    global questions, cur_idx, cur_score, game_active
+    global questions, cur_idx, cur_score
     all_q = await get_all_q()
-    if not all_q: js.alert("שגיאה בטעינת שאלות"); return
-    questions = random.sample(all_q, min(len(all_q), 10))
-    cur_idx, cur_score, game_active = 0, 0, True
+    questions = random.sample(all_q, 10)
+    cur_idx, cur_score = 0, 0
     switch("game-screen")
     load_question()
 
@@ -151,7 +146,7 @@ async def check_user_answer(e=None):
     global cur_idx, cur_score, t_task
     if t_task: js.clearInterval(t_task)
     
-    # בדיקת תשובה חסינה
+    # תיקון תשובות סופי: ניקוי מחרוזת מוחלט
     u_ans = str(js.document.getElementById("ans-input").value).strip().lower()
     c_ans = str(questions[cur_idx]['a']).strip().lower()
     
@@ -167,14 +162,11 @@ async def check_user_answer(e=None):
 
 async def end_game():
     u = js.localStorage.getItem("user")
-    # עדכון נקודות ב-DB
     res = await pyfetch(f"{DB}users/{u}.json")
-    userData = await res.json()
-    newPoints = (userData.get("points", 0) if userData else 0) + cur_score
-    await pyfetch(f"{DB}users/{u}.json", method="PATCH", body=json.dumps({"points": newPoints}))
-    
-    # הודעת סיכום
-    js.alert(f"המשחק נגמר! 🎉\nצברת {cur_score} תשובות נכונות מתוך 10.")
+    d = await res.json()
+    new_p = (d.get("points", 0) if d else 0) + cur_score
+    await pyfetch(f"{DB}users/{u}.json", method="PATCH", body=json.dumps({"points": new_p}))
+    js.alert(f"המשחק נגמר! קיבלת {cur_score} נקודות מתוך 10.")
     update_ui()
 
 async def show_leaderboard(e=None):
@@ -182,25 +174,23 @@ async def show_leaderboard(e=None):
     res = await pyfetch(f"{DB}users.json")
     users = await res.json() or {}
     sorted_u = sorted(users.items(), key=lambda x: x[1].get('points', 0), reverse=True)
-    my_u = js.localStorage.getItem("user")
     h = ""
     for i, (name, data) in enumerate(sorted_u[:10]):
         rank = i + 1
-        icon = "👑 " if rank == 1 else "🥈 " if rank == 2 else "🥉 " if rank == 3 else f"#{rank} "
-        me = "is-me" if name == my_u else ""
-        h += f'<div class="score-row {me}"><span>{icon}{name}</span><span>{data.get("points",0)} PTS</span></div>'
+        r_class = f"rank-{rank}" if rank <= 3 else ""
+        h += f'<div class="score-row {r_class}"><span>#{rank} {name}</span><span>{data.get("points",0)} PTS</span></div>'
     js.document.getElementById("leaderboard-cont").innerHTML = h
 
+# הגדרות ואימות
 async def auth_handler(e):
-    u = js.document.getElementById("auth-user").value.strip()
-    p = js.document.getElementById("auth-pass").value.strip()
+    u, p = js.document.getElementById("auth-user").value.strip(), js.document.getElementById("auth-pass").value.strip()
     if not u or not p: return
     hp = hashlib.sha256(p.encode()).hexdigest()
     if js.document.getElementById("auth-title").innerText == "כניסה":
         res = await pyfetch(f"{DB}users/{u}.json")
         d = await res.json()
         if d and d.get("p") == hp: js.localStorage.setItem("user", u); update_ui()
-        else: js.alert("פרטים לא נכונים")
+        else: js.alert("טעות")
     else:
         await pyfetch(f"{DB}users/{u}.json", method="PUT", body=json.dumps({"p": hp, "points": 0}))
         js.localStorage.setItem("user", u); update_ui()
@@ -215,7 +205,7 @@ def open_settings(e=None):
         grid.appendChild(span)
     switch("settings-screen")
 
-# חיבור כפתורים
+# חיווט כפתורים
 js.document.getElementById("go-login").onclick = create_proxy(lambda e: (setattr(js.document.getElementById("auth-title"), "innerText", "כניסה"), switch("auth-screen")))
 js.document.getElementById("go-reg").onclick = create_proxy(lambda e: (setattr(js.document.getElementById("auth-title"), "innerText", "הרשמה"), switch("auth-screen")))
 js.document.getElementById("play-solo").onclick = create_proxy(start_solo)
