@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Trivia Master Ultimate</title>
+    <title>Trivia Master V2 Fixed</title>
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <style>
-        :root { --bg: #1e1e2e; --card: #2a2a3d; --green: #4CAF50; --blue: #2196F3; --orange: #FF9800; --exit: #ff5555; --purple: #9c27b0; --gold: #ffd700; --silver: #c0c0c0; --bronze: #cd7f32; }
+        :root { --bg: #1e1e2e; --card: #2a2a3d; --green: #4CAF50; --blue: #2196F3; --orange: #FF9800; --exit: #ff5555; --purple: #9c27b0; }
         body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; transition: 0.3s; }
         .container { background: var(--card); padding: 25px; border-radius: 25px; width: 90%; max-width: 450px; min-height: 550px; box-shadow: 0 15px 35px rgba(0,0,0,0.6); text-align: center; border: 1px solid #444; position: relative; display: flex; flex-direction: column; }
-
-        /* גלגלת בצד שמאל רק בתפריט */
+        
+        /* גלגלת הגדרות - צד שמאל למעלה, מוסתרת כברירת מחדל */
         .settings-btn { position: absolute; top: 20px; left: 20px; background: none; border: none; font-size: 28px; cursor: pointer; z-index: 1000; display: none; }
 
         .screen { display: none; flex-direction: column; flex-grow: 1; justify-content: center; }
@@ -26,11 +26,7 @@
         
         .q-card { background: #33334d; padding: 20px; border-radius: 15px; margin: 15px 0; font-size: 22px; font-weight: bold; border: 1px solid #444; min-height: 80px; display: flex; align-items: center; justify-content: center; }
         
-        /* לוח תוצאות V2 */
         .score-row { display: flex; justify-content: space-between; padding: 12px; border-radius: 8px; margin-bottom: 4px; background: rgba(255,255,255,0.05); align-items: center; }
-        .rank-1 { border: 2px solid var(--gold); }
-        .rank-2 { border: 2px solid var(--silver); }
-        .rank-3 { border: 2px solid var(--bronze); }
     </style>
 </head>
 <body>
@@ -69,7 +65,7 @@
         <div id="settings-screen" class="screen">
             <h2>הגדרות</h2>
             <input type="text" id="new-username" placeholder="שם חדש">
-            <div id="emoji-picker" style="display:grid; grid-template-columns: repeat(5,1fr); gap:5px;"></div>
+            <div id="emoji-picker" style="display:grid; grid-template-columns: repeat(5,1fr); gap:5px; margin:10px 0;"></div>
             <button class="btn-green" id="save-profile">שמור</button>
             <button style="background:#555" id="settings-back">ביטול</button>
         </div>
@@ -100,7 +96,7 @@ questions, cur_idx, cur_score, timer_val, t_task = [], 0, 0, 15, None
 EMOJIS = ["🦁","🥷","🤖","🦄","🐯","🐸","🐱","🐶","🦊","🐼"]
 
 def switch(sid):
-    # גלגלת מופיעה רק בתפריט
+    # הגלגלת מופיעה רק בתפריט הראשי
     js.document.getElementById("gear-btn").style.display = "block" if sid == "menu-screen" else "none"
     for s in js.document.querySelectorAll(".screen"): s.classList.remove("active")
     js.document.getElementById(sid).classList.add("active")
@@ -114,22 +110,25 @@ def update_ui(e=None):
     switch("menu-screen")
 
 async def get_all_q():
-    res = await pyfetch(f"{DB}questions.json")
-    d = await res.json()
-    return d if isinstance(d, list) else list(d.values())
+    try:
+        res = await pyfetch(f"{DB}questions.json")
+        d = await res.json()
+        return d if isinstance(d, list) else list(d.values())
+    except: return []
 
 async def start_solo(e=None):
     global questions, cur_idx, cur_score
     all_q = await get_all_q()
-    questions = random.sample(all_q, 10)
+    if not all_q: return
+    questions = random.sample(all_q, min(len(all_q), 10))
     cur_idx, cur_score = 0, 0
     switch("game-screen")
     load_question()
 
 def load_question():
     global timer_val, t_task
-    if cur_idx >= 10: asyncio.ensure_future(end_game()); return
-    js.document.getElementById("q-count").innerText = f"{cur_idx+1}/10"
+    if cur_idx >= len(questions): asyncio.ensure_future(end_game()); return
+    js.document.getElementById("q-count").innerText = f"{cur_idx+1}/{len(questions)}"
     js.document.getElementById("q-text").innerText = questions[cur_idx]['q']
     js.document.getElementById("ans-input").value = ""
     timer_val = 15
@@ -146,7 +145,7 @@ async def check_user_answer(e=None):
     global cur_idx, cur_score, t_task
     if t_task: js.clearInterval(t_task)
     
-    # תיקון תשובות סופי: ניקוי מחרוזת מוחלט
+    # בדיקת תשובה - ניקוי רווחים והשוואת טקסט
     u_ans = str(js.document.getElementById("ans-input").value).strip().lower()
     c_ans = str(questions[cur_idx]['a']).strip().lower()
     
@@ -163,10 +162,10 @@ async def check_user_answer(e=None):
 async def end_game():
     u = js.localStorage.getItem("user")
     res = await pyfetch(f"{DB}users/{u}.json")
-    d = await res.json()
-    new_p = (d.get("points", 0) if d else 0) + cur_score
-    await pyfetch(f"{DB}users/{u}.json", method="PATCH", body=json.dumps({"points": new_p}))
-    js.alert(f"המשחק נגמר! קיבלת {cur_score} נקודות מתוך 10.")
+    userData = await res.json()
+    newPoints = (userData.get("points", 0) if userData else 0) + cur_score
+    await pyfetch(f"{DB}users/{u}.json", method="PATCH", body=json.dumps({"points": newPoints}))
+    js.alert(f"המשחק הסתיים! 🎉\nצברת {cur_score} נקודות.")
     update_ui()
 
 async def show_leaderboard(e=None):
@@ -176,21 +175,19 @@ async def show_leaderboard(e=None):
     sorted_u = sorted(users.items(), key=lambda x: x[1].get('points', 0), reverse=True)
     h = ""
     for i, (name, data) in enumerate(sorted_u[:10]):
-        rank = i + 1
-        r_class = f"rank-{rank}" if rank <= 3 else ""
-        h += f'<div class="score-row {r_class}"><span>#{rank} {name}</span><span>{data.get("points",0)} PTS</span></div>'
+        h += f'<div class="score-row"><span>#{i+1} {name}</span><span>{data.get("points",0)} PTS</span></div>'
     js.document.getElementById("leaderboard-cont").innerHTML = h
 
-# הגדרות ואימות
 async def auth_handler(e):
-    u, p = js.document.getElementById("auth-user").value.strip(), js.document.getElementById("auth-pass").value.strip()
+    u = js.document.getElementById("auth-user").value.strip()
+    p = js.document.getElementById("auth-pass").value.strip()
     if not u or not p: return
     hp = hashlib.sha256(p.encode()).hexdigest()
     if js.document.getElementById("auth-title").innerText == "כניסה":
         res = await pyfetch(f"{DB}users/{u}.json")
         d = await res.json()
         if d and d.get("p") == hp: js.localStorage.setItem("user", u); update_ui()
-        else: js.alert("טעות")
+        else: js.alert("טעות בפרטים")
     else:
         await pyfetch(f"{DB}users/{u}.json", method="PUT", body=json.dumps({"p": hp, "points": 0}))
         js.localStorage.setItem("user", u); update_ui()
@@ -205,7 +202,7 @@ def open_settings(e=None):
         grid.appendChild(span)
     switch("settings-screen")
 
-# חיווט כפתורים
+# חיווט אירועים - יציב (create_proxy)
 js.document.getElementById("go-login").onclick = create_proxy(lambda e: (setattr(js.document.getElementById("auth-title"), "innerText", "כניסה"), switch("auth-screen")))
 js.document.getElementById("go-reg").onclick = create_proxy(lambda e: (setattr(js.document.getElementById("auth-title"), "innerText", "הרשמה"), switch("auth-screen")))
 js.document.getElementById("play-solo").onclick = create_proxy(start_solo)
