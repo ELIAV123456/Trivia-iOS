@@ -219,20 +219,26 @@ async def tick():
 
 async def check_user_answer(e=None):
     global cur_idx, cur_score, t_task
-    if t_task: js.clearInterval(t_task)
-    u_ans = js.document.getElementById("ans-input").value.strip().lower()
-    c_ans = str(questions[cur_idx]['a']).strip().lower()
+    if t_task: js.clearInterval(t_task) # עוצר את הטיימר מיד
     
-    # V - ירוק לנכון, אדום לטעות
-    if u_ans == c_ans and u_ans != "":
+    # שליפת התשובה מהקלט וניקוי רווחים/אותיות גדולות
+    user_input = js.document.getElementById("ans-input").value.strip().lower()
+    
+    # שליפת התשובה הנכונה מהשאלון והפיכה לטקסט נקי
+    correct_answer = str(questions[cur_idx]['a']).strip().lower()
+    
+    # הבדיקה הלוגית
+    if user_input == correct_answer and user_input != "":
         cur_score += 1
-        js.document.body.style.background = "#2e7d32"
+        js.document.body.style.background = "#2e7d32" # ירוק להצלחה
     else:
-        js.document.body.style.background = "#c62828"
+        js.document.body.style.background = "#c62828" # אדום לטעות
         
+    # החזרת צבע הרקע לקדמותו אחרי חצי שנייה
     js.setTimeout(create_proxy(lambda: setattr(js.document.body.style, 'background', '#1e1e2e')), 500)
+    
     cur_idx += 1
-    load_question()
+    load_question() # עובר לשאלה הבאה
 
 async def end_game():
     u = js.localStorage.getItem("user")
