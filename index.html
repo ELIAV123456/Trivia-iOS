@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Trivia Quiz Pro - Lobby Edition</title>
+    <title>Trivia Quiz Pro - Champions League</title>
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <style>
@@ -31,21 +31,23 @@
         
         .q-card { background: #33334d; padding: 20px; border-radius: 15px; margin: 10px 0; min-height: 90px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; border: 1px solid #444; }
         
+        /* עיצוב טבלת ניקוד משופר */
+        .score-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #444; margin: 5px 0; border-radius: 10px; transition: 0.3s; }
+        .my-row { background: rgba(255, 215, 0, 0.15) !important; border: 2px solid var(--gold) !important; color: var(--gold) !important; }
+        
+        .rank-badge { border-radius: 50%; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; margin-left: 10px; color: white; font-weight: bold; background: #444; }
+        .rank-1 { background: var(--gold); color: black; box-shadow: 0 0 10px var(--gold); }
+        .rank-2 { background: var(--silver); color: black; }
+        .rank-3 { background: var(--bronze); color: white; }
+
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
         .shake { animation: shake 0.4s ease-in-out; border-color: var(--exit) !important; }
 
         .emoji-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 15px 0; }
-        .emoji-item { font-size: 30px; cursor: pointer; padding: 5px; border-radius: 8px; }
-        
-        /* עיצוב לובי */
-        .room-item { background: #33334d; padding: 12px; margin-bottom: 8px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #444; text-align: right; }
-        #rooms-list { max-height: 250px; overflow-y: auto; margin: 15px 0; padding: 5px; }
-
+        .room-item { background: #33334d; padding: 12px; margin-bottom: 8px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #444; }
+        #rooms-list { max-height: 250px; overflow-y: auto; margin: 15px 0; }
         .waiting { animation: pulse 1.5s infinite; color: var(--orange); }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-        
-        .my-row { background: rgba(255, 215, 0, 0.15) !important; border: 2px solid var(--gold) !important; color: var(--gold) !important; border-radius: 12px; padding: 10px; margin: 5px 0; }
-        .rank-badge { border-radius: 50%; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; margin-left: 10px; color: white; font-weight: bold; background: #444; }
     </style>
 </head>
 <body>
@@ -71,9 +73,7 @@
 
         <div id="lobby-screen" class="screen">
             <h2>🎮 לובי חדרים</h2>
-            <div id="rooms-list">
-                <p class="waiting">מחפש חדרים...</p>
-            </div>
+            <div id="rooms-list"><p class="waiting">מחפש חדרים...</p></div>
             <button class="btn-green" id="create-room-btn">➕ צור חדר חדש</button>
             <button style="background:#555" id="lobby-back">חזרה</button>
         </div>
@@ -91,6 +91,12 @@
             <button class="btn-exit" id="game-quit-btn" style="background:#555">🚪 צא ושמור</button>
         </div>
 
+        <div id="score-screen" class="screen">
+            <h1>🏆 טבלת אלופים</h1>
+            <div id="leaderboard-content" style="text-align: right;"></div>
+            <button style="background:#555" id="score-back">חזרה לתפריט</button>
+        </div>
+
         <div id="settings-screen" class="screen">
             <h2>⚙️ הגדרות</h2>
             <input type="text" id="set-new-name" placeholder="שם משתמש חדש">
@@ -106,12 +112,6 @@
                 <div id="my-final-score">הציון שלך: 0</div>
                 <div id="op-final-score" class="waiting">ממתין ליריב...</div>
             </div>
-        </div>
-
-        <div id="score-screen" class="screen">
-            <h1>🏆 טבלת אלופים</h1>
-            <div id="leaderboard-content"></div>
-            <button style="background:#555" id="score-back">חזרה</button>
         </div>
 
         <div id="auth-screen" class="screen">
@@ -162,7 +162,37 @@ async def load_q():
         return [v for v in q_list if v and isinstance(v, dict) and 'q' in v]
     except: return []
 
-# --- לובי ו-PVP ---
+async def show_scores(e=None):
+    u_me = js.localStorage.getItem("user")
+    switch_screen("score-screen")
+    js.document.getElementById("leaderboard-content").innerHTML = "<p class='waiting'>טוען אלופים...</p>"
+    
+    res = await pyfetch(f"{DB_URL}users.json")
+    users = await res.json()
+    
+    if users:
+        # מיון לפי נקודות
+        sorted_u = sorted(users.items(), key=lambda x: x[1].get('points', 0) if isinstance(x[1], dict) else 0, reverse=True)
+        h = ""
+        for i, (n, d) in enumerate(sorted_u[:10]):
+            is_me = (n == u_me)
+            # בחירת קלאס למדליה
+            m_class = f"rank-{i+1}" if i < 3 else ""
+            # בחירת קלאס לשורה שלי
+            row_class = "score-row my-row" if is_me else "score-row"
+            # הוספת כוכב ליד השם שלי
+            display_name = f"⭐ {n}" if is_me else n
+            
+            h += f"<div class='{row_class}'>"
+            h += f"  <div style='display:flex; align-items:center;'>"
+            h += f"    <span class='rank-badge {m_class}'>{i+1}</span>"
+            h += f"    <span style='font-weight:bold;'>{display_name}</span>"
+            h += f"  </div>"
+            h += f"  <span style='font-weight:bold; color:var(--blue);'>{int(d.get('points',0))} PTS</span>"
+            h += f"</div>"
+        js.document.getElementById("leaderboard-content").innerHTML = h
+
+# --- שאר הפונקציות נשארות זהות כדי לא להרוס כלום ---
 
 async def open_lobby(e=None):
     switch_screen("lobby-screen")
@@ -225,8 +255,6 @@ async def wait_for_op():
             js.document.getElementById("game-check-btn").disabled = False
             next_q(); break
 
-# --- לוגיקה משחק ---
-
 async def start_normal(e=None):
     global questions, idx, score, is_pvp, game_active
     idx, score, is_pvp, game_active = 0, 0, False, True
@@ -276,12 +304,10 @@ async def finish():
     game_active = False
     if timer_event: js.clearInterval(timer_event)
     u = js.localStorage.getItem("user")
-    # עדכון נקודות
     res = await pyfetch(f"{DB_URL}users/{u}.json")
     ud = await res.json()
     new_total = (ud.get('points', 0) if ud else 0) + score
     await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": new_total}))
-    
     if not is_pvp:
         js.alert(f"הסתיים! צברת {int(score)} נקודות.")
         update_menu(); switch_screen("menu-screen")
@@ -311,19 +337,6 @@ async def handle_quit(e=None):
     game_active = False
     if is_pvp and current_room_id: await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="DELETE")
     update_menu(); switch_screen("menu-screen")
-
-# --- שונות ואימות ---
-
-async def show_scores(e=None):
-    switch_screen("score-screen")
-    res = await pyfetch(f"{DB_URL}users.json")
-    users = await res.json()
-    if users:
-        sorted_u = sorted(users.items(), key=lambda x: x[1].get('points', 0) if isinstance(x[1], dict) else 0, reverse=True)
-        h = ""
-        for i, (n, d) in enumerate(sorted_u[:10]):
-            h += f"<div style='display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #444;'><span>#{i+1} {n}</span><span>{int(d.get('points',0))}</span></div>"
-        js.document.getElementById("leaderboard-content").innerHTML = h
 
 async def do_auth(e=None):
     u, p = js.document.getElementById("auth-u").value.strip(), js.document.getElementById("auth-p").value.strip()
