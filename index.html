@@ -50,16 +50,15 @@
 
         <div id="menu-screen" class="screen active">
             <h1>🎮 Trivia Quiz </h1>
-            <p id="hello-user"></p>
+            <div id="hello-user"></div>
             <div id="logged-in-ui" style="display:none">
                 <button class="btn-green" id="start-game-btn">משחק רגיל</button>
                 <button class="btn-purple" id="start-pvp-btn">⚔️ קרב 1 על 1</button>
                 <button style="background:var(--orange)" id="view-scores-btn">לוח תוצאות</button>
                 <div class="updates-box">
                     <div style="font-weight:bold; margin-bottom:5px;">🚀 עדכונים (v2.0.1)</div>
-                    <div><span class="update-tag">FIX</span> יציבות טעינת שאלות תוקנה.</div>
-                    <div><span class="update-tag">FIX</span> הודעות ניקוד בסיום.</div>
-                    <div><span class="update-tag">FIX</span> הגנה מפני דריסת חשבונות.</div>
+                    <div><span class="update-tag">FIX</span> הודעות סיכום מתוקנות.</div>
+                    <div><span class="update-tag">FIX</span> יציבות שרת משופרת.</div>
                 </div>
             </div>
             <div id="logged-out-ui">
@@ -134,25 +133,34 @@ EMOJIS = ["🦁","🥷","🤖","🦄","🐯","🐸","🐱","🐶","🦊","🐼",
 def play_s(sid):
     if js.document.getElementById("game-screen").classList.contains("active"):
         try:
-            a = js.document.getElementById(sid); a.currentTime = 0; a.play()
+            a = js.document.getElementById(sid)
+            a.currentTime = 0
+            a.play()
         except: pass
 
 def update_menu():
-    u = js.localStorage.getItem("user"); em = js.localStorage.getItem("emoji") or "👤"
-    js.document.getElementById("hello-user").innerHTML = f"<span style='font-size:24px'>{em}</span> שלום, <span style='color:var(--blue)'>{u}</span>" if u else ""
+    u = js.localStorage.getItem("user")
+    em = js.localStorage.getItem("emoji") or "👤"
+    if u:
+        js.document.getElementById("hello-user").innerHTML = f"<div style='margin-bottom:15px;'><span style='font-size:24px'>{em}</span> שלום, <span style='color:var(--blue)'>{u}</span></div>"
+    else:
+        js.document.getElementById("hello-user").innerHTML = ""
     js.document.getElementById("logged-in-ui").style.display = "block" if u else "none"
     js.document.getElementById("logged-out-ui").style.display = "none" if u else "block"
 
 def switch_screen(sid):
     global game_active
     js.document.getElementById("gear-btn").style.display = "block" if sid == "menu-screen" and js.localStorage.getItem("user") else "none"
-    for s in js.document.querySelectorAll(".screen"): s.classList.remove("active")
+    for s in js.document.querySelectorAll(".screen"):
+        s.classList.remove("active")
     js.document.getElementById(sid).classList.add("active")
-    if sid != "game-screen": game_active = False
+    if sid != "game-screen":
+        game_active = False
 
 async def load_q():
     try:
-        res = await pyfetch(f"{DB_URL}questions.json"); data = await res.json()
+        res = await pyfetch(f"{DB_URL}questions.json")
+        data = await res.json()
         if isinstance(data, list): q_list = data
         elif isinstance(data, dict): q_list = data.get('questions', list(data.values()))
         else: q_list = []
@@ -160,33 +168,46 @@ async def load_q():
     except: return []
 
 async def do_auth(e=None):
-    u, p = js.document.getElementById("auth-u").value.strip(), js.document.getElementById("auth-p").value.strip()
+    u = js.document.getElementById("auth-u").value.strip()
+    p = js.document.getElementById("auth-p").value.strip()
     if not u: return
     hp = hashlib.sha256((p + "Trivia2026").encode()).hexdigest()
-    res = await pyfetch(f"{DB_URL}users/{u}.json"); existing = await res.json()
+    res = await pyfetch(f"{DB_URL}users/{u}.json")
+    existing = await res.json()
     
     if js.document.getElementById("auth-title").innerText == "כניסה":
         if existing and existing.get("password") == hp:
-            js.localStorage.setItem("user", u); js.localStorage.setItem("emoji", existing.get("emoji", "👤"))
-            update_menu(); switch_screen("menu-screen")
-        else: js.alert("פרטים שגויים")
-    else: # הרשמה
+            js.localStorage.setItem("user", u)
+            js.localStorage.setItem("emoji", existing.get("emoji", "👤"))
+            update_menu()
+            switch_screen("menu-screen")
+        else:
+            js.window.alert("פרטים שגויים")
+    else:
         if existing:
-            js.alert("שגיאה: שם המשתמש תפוס!")
+            js.window.alert("שגיאה: שם המשתמש תפוס!")
         else:
             await pyfetch(f"{DB_URL}users/{u}.json", method="PUT", body=json.dumps({"password": hp, "points": 0, "emoji": "👤"}))
-            js.localStorage.setItem("user", u); js.localStorage.setItem("emoji", "👤")
-            js.alert("נרשמת בהצלחה!"); update_menu(); switch_screen("menu-screen")
+            js.localStorage.setItem("user", u)
+            js.localStorage.setItem("emoji", "👤")
+            js.window.alert("נרשמת בהצלחה!")
+            update_menu()
+            switch_screen("menu-screen")
 
 async def save_settings(e=None):
-    old_u = js.localStorage.getItem("user"); new_u = js.document.getElementById("set-new-name").value.strip()
+    old_u = js.localStorage.getItem("user")
+    new_u = js.document.getElementById("set-new-name").value.strip()
     emoji = js.localStorage.getItem("emoji") or "👤"
     if not new_u or not old_u: return
     
     if new_u != old_u:
-        res = await pyfetch(f"{DB_URL}users/{new_u}.json"); existing = await res.json()
-        if existing: js.alert("השם החדש כבר תפוס!"); return
-        res = await pyfetch(f"{DB_URL}users/{old_u}.json"); data = await res.json()
+        res = await pyfetch(f"{DB_URL}users/{new_u}.json")
+        existing = await res.json()
+        if existing:
+            js.window.alert("השם החדש כבר תפוס!")
+            return
+        res = await pyfetch(f"{DB_URL}users/{old_u}.json")
+        data = await res.json()
         if data:
             data["emoji"] = emoji
             await pyfetch(f"{DB_URL}users/{new_u}.json", method="PUT", body=json.dumps(data))
@@ -195,7 +216,9 @@ async def save_settings(e=None):
     else:
         await pyfetch(f"{DB_URL}users/{old_u}.json", method="PATCH", body=json.dumps({"emoji": emoji}))
     
-    js.alert("הגדרות נשמרו!"); update_menu(); switch_screen("menu-screen")
+    js.window.alert("הגדרות נשמרו!")
+    update_menu()
+    switch_screen("menu-screen")
 
 async def check_ans(e=None):
     global idx, score, timer_event
@@ -206,97 +229,97 @@ async def check_ans(e=None):
     fb = js.document.getElementById("game-feedback")
     
     if ans in corrects and ans != "":
-        pts = 2 if timer_val > 10 else 1; score += pts; play_s("snd-correct")
-        fb.innerHTML = f"<span style='color:var(--green)'>נכון! ✅</span>"
+        pts = 2 if timer_val > 10 else 1
+        score += pts
+        play_s("snd-correct")
+        fb.innerHTML = "<span style='color:var(--green)'>נכון! ✅</span>"
     else:
-        score = max(0, score - 1); play_s("snd-wrong")
+        score = max(0, score - 1)
+        play_s("snd-wrong")
         js.document.getElementById("game-ans").classList.add("shake")
         fb.innerHTML = f"<span style='color:var(--exit)'>טעות! התשובה: {corrects[0]}</span>"
     
     js.document.getElementById("game-score-display").innerText = f"🏆 {int(score)}"
-    idx += 1; js.setTimeout(create_proxy(next_q), 1500)
+    idx += 1
+    js.setTimeout(create_proxy(next_q), 1500)
 
 async def finish():
     global game_active
     game_active = False
-    if timer_event:
-        js.clearInterval(timer_event)
+    if timer_event: js.clearInterval(timer_event)
     
     u = js.localStorage.getItem("user")
-    pts_to_show = int(score) # שומרים את הניקוד בצד
+    final_pts = int(score)
     
     if not is_pvp:
         try:
-            # ניסיון שמירה בשרת
             res = await pyfetch(f"{DB_URL}users/{u}.json")
             ud = await res.json()
-            new_total = (ud.get('points', 0) if ud else 0) + pts_to_show
+            new_total = (ud.get('points', 0) if ud else 0) + final_pts
             await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": new_total}))
-        except Exception as e:
-            print(f"Save error: {e}")
+        except: pass
         
-        # הודעה למשתמש (משתמשים ב-window.alert הישיר)
-        js.window.alert(f"המשחק נגמר! הרווחת {pts_to_show} נקודות.")
-        
+        js.window.alert(f"המשחק נגמר! הרווחת {final_pts} נקודות.")
         update_menu()
         switch_screen("menu-screen")
     else:
-        # כאן ה-PVP
         switch_screen("result-screen")
-        js.document.getElementById("my-final-score").innerText = f"הציון שלך: {pts_to_show}"
+        js.document.getElementById("my-final-score").innerText = f"הציון שלך: {final_pts}"
         f = "p1_score" if i_am_p1 else "p2_score"
-        try:
-            await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="PATCH", body=json.dumps({f: pts_to_show}))
-        except: pass
+        await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="PATCH", body=json.dumps({f: final_pts}))
         asyncio.ensure_future(monitor_results())
 
 async def monitor_results():
-    global current_room_id; u = js.localStorage.getItem("user")
+    global current_room_id
+    u = js.localStorage.getItem("user")
     for _ in range(15):
         await asyncio.sleep(1)
         if not current_room_id: break
         try:
-            res = await pyfetch(f"{DB_URL}rooms/{current_room_id}.json"); d = await res.json()
+            res = await pyfetch(f"{DB_URL}rooms/{current_room_id}.json")
+            d = await res.json()
             if d and d.get("p1_score", -1) != -1 and d.get("p2_score", -1) != -1:
                 p1s, p2s = d["p1_score"], d["p2_score"]
                 my, op = (p1s, p2s) if i_am_p1 else (p2s, p1s)
                 js.document.getElementById("op-final-score").innerText = f"ציון יריב: {int(op)}"
+                
                 if my > op:
                     js.document.getElementById("result-title").innerText = "🏆 ניצחת!"
                     ures = await pyfetch(f"{DB_URL}users/{u}.json")
                     ud = await ures.json()
                     await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": ud.get('points',0) + my}))
-                    js.alert(f"ניצחת בקרב! כל הכבוד, {int(my)} נקודות נוספו.")
+                    js.window.alert(f"ניצחת בקרב! כל הכבוד, {int(my)} נקודות נוספו.")
                 elif my < op:
                     js.document.getElementById("result-title").innerText = "😞 הפסדת"
                 else:
                     js.document.getElementById("result-title").innerText = "🤝 תיקו"
-                    js.alert("תיקו! קרב צמוד מאוד.")
-                await asyncio.sleep(4); break
+                    js.window.alert("תיקו! קרב צמוד מאוד.")
+                
+                await asyncio.sleep(4)
+                break
         except: break
-    if i_am_p1 and current_room_id: await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="DELETE")
-    current_room_id = None; update_menu(); switch_screen("menu-screen")
-    
+        
+    if i_am_p1 and current_room_id:
+        await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="DELETE")
+    current_room_id = None
+    update_menu()
+    switch_screen("menu-screen")
+
 async def handle_quit(e=None):
     global game_active, current_room_id, timer_event
     if timer_event: js.clearInterval(timer_event)
-    
     u = js.localStorage.getItem("user")
-    # שמירת נקודות במשחק רגיל לפני היציאה
     if not is_pvp and score > 0:
         try:
             res = await pyfetch(f"{DB_URL}users/{u}.json")
             ud = await res.json()
-            new_total = (ud.get('points', 0) if ud else 0) + score
+            new_total = (ud.get('points', 0) if ud else 0) + int(score)
             await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": new_total}))
-            js.alert(f"פרשת מהמשחק. {int(score)} נקודות נשמרו.")
+            js.window.alert(f"פרשת. {int(score)} נקודות נשמרו.")
         except: pass
-    
-    # מחיקת חדר אם זה PVP
     if is_pvp and current_room_id:
         try: await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="DELETE")
         except: pass
-    
     current_room_id = None
     game_active = False
     update_menu()
@@ -304,77 +327,125 @@ async def handle_quit(e=None):
 
 async def open_settings(e=None):
     js.document.getElementById("set-new-name").value = js.localStorage.getItem("user")
-    grid = js.document.getElementById("emoji-list"); grid.innerHTML = ""
+    grid = js.document.getElementById("emoji-list")
+    grid.innerHTML = ""
     for em in EMOJIS:
-        d = js.document.createElement("div"); d.className = "emoji-item"; d.innerText = em
-        d.onclick = create_proxy(lambda e, v=em: (js.localStorage.setItem("emoji", v), js.alert(f"נבחר: {v}")))
+        d = js.document.createElement("div")
+        d.className = "emoji-item"
+        d.innerText = em
+        d.onclick = create_proxy(lambda e, v=em: (js.localStorage.setItem("emoji", v), js.window.alert(f"נבחר: {v}")))
         grid.appendChild(d)
     switch_screen("settings-screen")
 
 async def refresh_rooms():
-    cont = js.document.getElementById("rooms-list"); u_me = js.localStorage.getItem("user")
-    res = await pyfetch(f"{DB_URL}rooms.json"); rooms = await res.json() if res.status == 200 else None
-    cont.innerHTML = ""
-    if not rooms or not isinstance(rooms, dict):
-        cont.innerHTML = "<p>אין חדרים זמינים.</p>"; return
-    for rid, rd in rooms.items():
-        if rd.get("status") == "waiting":
-            d = js.document.createElement("div"); d.className = "room-item"; d.innerHTML = f"<span>חדר של {rd.get('player1')}</span>"
-            b = js.document.createElement("button"); b.innerText = "הצטרף"; b.className = "btn-green"; b.style.width = "100px"
-            b.onclick = create_proxy(lambda e, r=rid: asyncio.ensure_future(join_room(r)))
-            d.appendChild(b); cont.appendChild(d)
+    cont = js.document.getElementById("rooms-list")
+    try:
+        res = await pyfetch(f"{DB_URL}rooms.json")
+        rooms = await res.json() if res.status == 200 else None
+        cont.innerHTML = ""
+        if not rooms or not isinstance(rooms, dict):
+            cont.innerHTML = "<p>אין חדרים זמינים.</p>"
+            return
+        for rid, rd in rooms.items():
+            if rd.get("status") == "waiting":
+                d = js.document.createElement("div")
+                d.className = "room-item"
+                d.innerHTML = f"<span>חדר של {rd.get('player1')}</span>"
+                b = js.document.createElement("button")
+                b.innerText = "הצטרף"
+                b.className = "btn-green"
+                b.style.width = "100px"
+                b.onclick = create_proxy(lambda e, r=rid: asyncio.ensure_future(join_room(r)))
+                d.appendChild(b)
+                cont.appendChild(d)
+    except:
+        cont.innerHTML = "<p>אין חדרים זמינים.</p>"
 
 async def create_room(e=None):
     global questions, current_room_id, i_am_p1, is_pvp, game_active, score, idx
     u, score, idx = js.localStorage.getItem("user"), 0, 0
     current_room_id, i_am_p1, is_pvp = f"room_{u}", True, True
-    switch_screen("game-screen"); js.document.getElementById("game-check-btn").disabled = True
+    switch_screen("game-screen")
+    js.document.getElementById("game-check-btn").disabled = True
     js.document.getElementById("q-text").innerHTML = "<span class='waiting'>מחכה ליריב...</span>"
-    q_all = await load_q(); questions = random.sample(q_all, 10)
+    q_all = await load_q()
+    questions = random.sample(q_all, 10)
     await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="PUT", body=json.dumps({"player1": u, "status": "waiting", "questions": questions, "p1_score": -1, "p2_score": -1}))
     while current_room_id:
-        await asyncio.sleep(2); r = await (await pyfetch(f"{DB_URL}rooms/{current_room_id}.json")).json()
-        if r and r.get("status") == "active": game_active = True; js.document.getElementById("game-check-btn").disabled = False; next_q(); break
+        await asyncio.sleep(2)
+        try:
+            res = await pyfetch(f"{DB_URL}rooms/{current_room_id}.json")
+            r = await res.json()
+            if r and r.get("status") == "active":
+                game_active = True
+                js.document.getElementById("game-check-btn").disabled = False
+                next_q()
+                break
+        except: break
 
 async def join_room(rid):
     global questions, current_room_id, i_am_p1, is_pvp, game_active, score, idx
     u, score, idx = js.localStorage.getItem("user"), 0, 0
     current_room_id, i_am_p1, is_pvp, game_active = rid, False, True, True
     await pyfetch(f"{DB_URL}rooms/{rid}.json", method="PATCH", body=json.dumps({"player2": u, "status": "active"}))
-    data = await (await pyfetch(f"{DB_URL}rooms/{rid}.json")).json()
-    questions = data['questions']; switch_screen("game-screen"); next_q()
+    res = await pyfetch(f"{DB_URL}rooms/{rid}.json")
+    data = await res.json()
+    questions = data['questions']
+    switch_screen("game-screen")
+    next_q()
 
 async def start_normal(e=None):
-    global questions, idx, score, is_pvp, game_active; idx, score, is_pvp, game_active = 0, 0, False, True
-    q_all = await load_q(); questions = random.sample(q_all, 10); switch_screen("game-screen"); next_q()
+    global questions, idx, score, is_pvp, game_active
+    idx, score, is_pvp, game_active = 0, 0, False, True
+    q_all = await load_q()
+    questions = random.sample(q_all, 10)
+    switch_screen("game-screen")
+    next_q()
 
 def next_q():
     global idx, timer_val, timer_event
-    if idx >= 10: asyncio.ensure_future(finish()); return
-    timer_val = 15; js.document.getElementById("q-count").innerText = f"{idx+1}/10"; js.document.getElementById("q-text").innerText = questions[idx]['q']
-    js.document.getElementById("game-ans").value = ""; js.document.getElementById("game-feedback").innerText = ""
-    js.document.getElementById("game-ans").classList.remove("shake"); js.document.getElementById("game-check-btn").disabled = False
+    if idx >= 10:
+        asyncio.ensure_future(finish())
+        return
+    timer_val = 15
+    js.document.getElementById("q-count").innerText = f"{idx+1}/10"
+    js.document.getElementById("q-text").innerText = questions[idx]['q']
+    js.document.getElementById("game-ans").value = ""
+    js.document.getElementById("game-feedback").innerText = ""
+    js.document.getElementById("game-ans").classList.remove("shake")
+    js.document.getElementById("game-check-btn").disabled = False
     if timer_event: js.clearInterval(timer_event)
     timer_event = js.setInterval(create_proxy(lambda: asyncio.ensure_future(upd_timer())), 1000)
 
 async def upd_timer():
     global timer_val
-    if timer_val > 0: timer_val -= 1; js.document.getElementById("timer").innerText = f"⏱️ {timer_val}"
-    else: await check_ans()
+    if timer_val > 0:
+        timer_val -= 1
+        js.document.getElementById("timer").innerText = f"⏱️ {timer_val}"
+    else:
+        await check_ans()
 
 async def show_scores(e=None):
-    switch_screen("score-screen"); cont = js.document.getElementById("leaderboard-content"); cont.innerHTML = "טוען..."
-    users = await (await pyfetch(f"{DB_URL}users.json")).json()
-    if not users: return
-    sorted_u = sorted(users.items(), key=lambda x: x[1].get('points', 0), reverse=True)
-    h = ""; u_me = js.localStorage.getItem("user")
-    for i, (n, d) in enumerate(sorted_u[:10]):
-        m = {0: "🥇", 1: "🥈", 2: "🥉"}.get(i, i+1)
-        row_c = "score-row my-row" if n == u_me else "score-row"
-        h += f"<div class='{row_c}'><div><span class='rank-badge'>{m}</span> {d.get('emoji','👤')} {n}</div><b>{int(d.get('points',0))}</b></div>"
-    cont.innerHTML = h
+    switch_screen("score-screen")
+    cont = js.document.getElementById("leaderboard-content")
+    cont.innerHTML = "טוען..."
+    try:
+        res = await pyfetch(f"{DB_URL}users.json")
+        users = await res.json()
+        if not users: return
+        sorted_u = sorted(users.items(), key=lambda x: x[1].get('points', 0), reverse=True)
+        h = ""
+        u_me = js.localStorage.getItem("user")
+        for i, (n, d) in enumerate(sorted_u[:10]):
+            m = {0: "🥇", 1: "🥈", 2: "🥉"}.get(i, i+1)
+            row_c = "score-row my-row" if n == u_me else "score-row"
+            h += f"<div class='{row_c}'><div><span class='rank-badge'>{m}</span> {d.get('emoji','👤')} {n}</div><b>{int(d.get('points',0))}</b></div>"
+        cont.innerHTML = h
+    except:
+        cont.innerHTML = "שגיאה בטעינת הנתונים."
 
 def run_coro(f): return create_proxy(lambda e: asyncio.ensure_future(f(e)))
+
 js.document.getElementById("start-game-btn").onclick = run_coro(start_normal)
 js.document.getElementById("game-quit-btn").onclick = run_coro(handle_quit)
 js.document.getElementById("start-pvp-btn").onclick = create_proxy(lambda e: (asyncio.ensure_future(refresh_rooms()), switch_screen("lobby-screen")))
@@ -385,8 +456,10 @@ js.document.getElementById("gear-btn").onclick = run_coro(open_settings)
 js.document.getElementById("save-settings-btn").onclick = run_coro(save_settings)
 js.document.getElementById("auth-submit").onclick = run_coro(do_auth)
 js.document.getElementById("logout-btn").onclick = create_proxy(lambda e: (js.localStorage.clear(), update_menu(), switch_screen("menu-screen")))
+
 for b in ["lobby-back", "score-back", "settings-back", "auth-back"]:
     js.document.getElementById(b).onclick = create_proxy(lambda e: switch_screen("menu-screen"))
+
 js.document.getElementById("go-login-btn").onclick = create_proxy(lambda e: (setattr(js.document.getElementById("auth-title"),'innerText','כניסה'), switch_screen("auth-screen")))
 js.document.getElementById("go-reg-btn").onclick = create_proxy(lambda e: (setattr(js.document.getElementById("auth-title"),'innerText','הרשמה'), switch_screen("auth-screen")))
 
