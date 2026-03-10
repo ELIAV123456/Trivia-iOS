@@ -225,19 +225,20 @@ async def finish():
     u = js.localStorage.getItem("user")
     
     if not is_pvp:
-        # שליחת הנתונים
+        # שמירת הניקוד בשרת
         res = await pyfetch(f"{DB_URL}users/{u}.json")
         ud = await res.json()
         new_total = (ud.get('points', 0) if ud else 0) + score
         await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": new_total}))
         
-        # ההודעה הקופצת
-        js.alert(f"המשחק נגמר! הרווחת {int(score)} נקודות.") 
+        # הצגת ההודעה - זה החלק שחשוב שיהיה בשורה נפרדת
+        js.alert(f"המשחק נגמר! הרווחת {int(score)} נקודות.")
         
-        # חזרה לתפריט
+        # רק אחרי האישור של המשתמש, עוברים מסך
         update_menu()
         switch_screen("menu-screen")
     else:
+        # קוד ה-PVP
         switch_screen("result-screen")
         js.document.getElementById("my-final-score").innerText = f"הציון שלך: {int(score)}"
         f = "p1_score" if i_am_p1 else "p2_score"
