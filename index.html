@@ -225,20 +225,22 @@ async def finish():
     u = js.localStorage.getItem("user")
     
     if not is_pvp:
-        # שמירת הניקוד בשרת
+        # שמירה בבסיס הנתונים
         res = await pyfetch(f"{DB_URL}users/{u}.json")
         ud = await res.json()
-        new_total = (ud.get('points', 0) if ud else 0) + score
+        points_to_add = int(score)
+        current_points = ud.get('points', 0) if ud else 0
+        new_total = current_points + points_to_add
+        
         await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": new_total}))
         
-        # הצגת ההודעה - זה החלק שחשוב שיהיה בשורה נפרדת
-        js.alert(f"המשחק נגמר! הרווחת {int(score)} נקודות.")
+        # הודעה למשתמש
+        js.alert(f"המשחק נגמר! הרווחת {points_to_add} נקודות.")
         
-        # רק אחרי האישור של המשתמש, עוברים מסך
+        # מעבר מסך
         update_menu()
         switch_screen("menu-screen")
     else:
-        # קוד ה-PVP
         switch_screen("result-screen")
         js.document.getElementById("my-final-score").innerText = f"הציון שלך: {int(score)}"
         f = "p1_score" if i_am_p1 else "p2_score"
@@ -261,10 +263,9 @@ async def monitor_results():
                     ures = await pyfetch(f"{DB_URL}users/{u}.json")
                     ud = await ures.json()
                     await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": ud.get('points',0) + my}))
-                    js.alert(f"ניצחת בקרב! כל הכבוד, {int(my)} נקודות נוספו לחשבונך.")
+                    js.alert(f"ניצחת בקרב! כל הכבוד, {int(my)} נקודות נוספו.")
                 elif my < op:
                     js.document.getElementById("result-title").innerText = "😞 הפסדת"
-                    js.alert(f"הפסדת הפעם... לא נורא, הציון שלך הוא {int(my)}")
                 else:
                     js.document.getElementById("result-title").innerText = "🤝 תיקו"
                     js.alert("תיקו! קרב צמוד מאוד.")
