@@ -56,7 +56,7 @@
                 <button class="btn-purple" id="start-pvp-btn">⚔️ קרב 1 על 1</button>
                 <button style="background:var(--orange)" id="view-scores-btn">לוח תוצאות</button>
                 <div class="updates-box">
-                    <div style="font-weight:bold; margin-bottom:5px;">🚀 עדכונים (v2.0.1)</div>
+                    <div style="font-weight:bold; margin-bottom:5px;">🚀 עדכונים (v2.0.2)</div>
                     <div><span class="update-tag">FIX</span> הודעות סיכום מתוקנות.</div>
                     <div><span class="update-tag">FIX</span> יציבות שרת משופרת.</div>
                 </div>
@@ -246,27 +246,30 @@ async def check_ans(e=None):
 async def finish():
     global game_active
     game_active = False
-    if timer_event: js.clearInterval(timer_event)
+    if timer_event:
+        js.clearInterval(timer_event)
     
     u = js.localStorage.getItem("user")
-    final_pts = int(score)
+    final_score = int(score)
     
     if not is_pvp:
         try:
             res = await pyfetch(f"{DB_URL}users/{u}.json")
             ud = await res.json()
-            new_total = (ud.get('points', 0) if ud else 0) + final_pts
+            new_total = (ud.get('points', 0) if ud else 0) + final_score
             await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": new_total}))
-        except: pass
+        except:
+            pass
         
-        js.window.alert(f"המשחק נגמר! הרווחת {final_pts} נקודות.")
+        # ההודעה מחוץ ל-try כדי שתופיע גם אם השרת נפל
+        js.window.alert(f"המשחק נגמר! הרווחת {final_score} נקודות.")
         update_menu()
         switch_screen("menu-screen")
     else:
         switch_screen("result-screen")
-        js.document.getElementById("my-final-score").innerText = f"הציון שלך: {final_pts}"
+        js.document.getElementById("my-final-score").innerText = f"הציון שלך: {final_score}"
         f = "p1_score" if i_am_p1 else "p2_score"
-        await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="PATCH", body=json.dumps({f: final_pts}))
+        await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="PATCH", body=json.dumps({f: final_score}))
         asyncio.ensure_future(monitor_results())
 
 async def monitor_results():
@@ -309,17 +312,20 @@ async def handle_quit(e=None):
     global game_active, current_room_id, timer_event
     if timer_event: js.clearInterval(timer_event)
     u = js.localStorage.getItem("user")
-    if not is_pvp and score > 0:
+    
+    if not is_pvp:
         try:
             res = await pyfetch(f"{DB_URL}users/{u}.json")
             ud = await res.json()
             new_total = (ud.get('points', 0) if ud else 0) + int(score)
             await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": new_total}))
-            js.window.alert(f"פרשת. {int(score)} נקודות נשמרו.")
+            js.window.alert(f"פרשת מהמשחק. {int(score)} נקודות נשמרו.")
         except: pass
+    
     if is_pvp and current_room_id:
         try: await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="DELETE")
         except: pass
+    
     current_room_id = None
     game_active = False
     update_menu()
