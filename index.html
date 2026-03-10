@@ -254,6 +254,30 @@ async def monitor_results():
         except: break
     if i_am_p1 and current_room_id: await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="DELETE")
     current_room_id = None; update_menu(); switch_screen("menu-screen")
+    
+async def handle_quit(e=None):
+    global game_active, current_room_id, timer_event
+    if timer_event: js.clearInterval(timer_event)
+    
+    u = js.localStorage.getItem("user")
+    # שמירת נקודות במשחק רגיל לפני היציאה
+    if not is_pvp and score > 0:
+        try:
+            res = await pyfetch(f"{DB_URL}users/{u}.json")
+            ud = await res.json()
+            new_total = (ud.get('points', 0) if ud else 0) + score
+            await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": new_total}))
+        except: pass
+    
+    # מחיקת חדר אם זה PVP
+    if is_pvp and current_room_id:
+        try: await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="DELETE")
+        except: pass
+    
+    current_room_id = None
+    game_active = False
+    update_menu()
+    switch_screen("menu-screen")
 
 async def open_settings(e=None):
     js.document.getElementById("set-new-name").value = js.localStorage.getItem("user")
@@ -329,6 +353,7 @@ async def show_scores(e=None):
 
 def run_coro(f): return create_proxy(lambda e: asyncio.ensure_future(f(e)))
 js.document.getElementById("start-game-btn").onclick = run_coro(start_normal)
+js.document.getElementById("game-quit-btn").onclick = run_coro(handle_quit)
 js.document.getElementById("start-pvp-btn").onclick = create_proxy(lambda e: (asyncio.ensure_future(refresh_rooms()), switch_screen("lobby-screen")))
 js.document.getElementById("create-room-btn").onclick = run_coro(create_room)
 js.document.getElementById("game-check-btn").onclick = run_coro(check_ans)
