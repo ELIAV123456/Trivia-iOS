@@ -249,7 +249,8 @@ async def monitor_results():
                     ures = await pyfetch(f"{DB_URL}users/{u}.json"); ud = await ures.json()
                     await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": ud.get('points',0) + my}))
                     js.alert(f"ניצחת בקרב! כל הכבוד, {int(my)} נקודות נוספו לחשבונך.")
-                elif my < op: js.document.getElementById("result-title").innerText = "😞 הפסדת"
+                elif my < op:
+                    js.document.getElementById("result-title").innerText = "😞 הפסדת"
                 else: 
                     js.document.getElementById("result-title").innerText = "🤝 תיקו"
                     js.alert("תיקו! קרב צמוד מאוד.")
