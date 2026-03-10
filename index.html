@@ -223,28 +223,31 @@ async def finish():
         js.clearInterval(timer_event)
     
     u = js.localStorage.getItem("user")
+    pts_to_show = int(score) # שומרים את הניקוד בצד
     
     if not is_pvp:
-        # שמירה בבסיס הנתונים
-        res = await pyfetch(f"{DB_URL}users/{u}.json")
-        ud = await res.json()
-        points_to_add = int(score)
-        current_points = ud.get('points', 0) if ud else 0
-        new_total = current_points + points_to_add
+        try:
+            # ניסיון שמירה בשרת
+            res = await pyfetch(f"{DB_URL}users/{u}.json")
+            ud = await res.json()
+            new_total = (ud.get('points', 0) if ud else 0) + pts_to_show
+            await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": new_total}))
+        except Exception as e:
+            print(f"Save error: {e}")
         
-        await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": new_total}))
+        # הודעה למשתמש (משתמשים ב-window.alert הישיר)
+        js.window.alert(f"המשחק נגמר! הרווחת {pts_to_show} נקודות.")
         
-        # הודעה למשתמש
-        js.alert(f"המשחק נגמר! הרווחת {points_to_add} נקודות.")
-        
-        # מעבר מסך
         update_menu()
         switch_screen("menu-screen")
     else:
+        # כאן ה-PVP
         switch_screen("result-screen")
-        js.document.getElementById("my-final-score").innerText = f"הציון שלך: {int(score)}"
+        js.document.getElementById("my-final-score").innerText = f"הציון שלך: {pts_to_show}"
         f = "p1_score" if i_am_p1 else "p2_score"
-        await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="PATCH", body=json.dumps({f: score}))
+        try:
+            await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="PATCH", body=json.dumps({f: pts_to_show}))
+        except: pass
         asyncio.ensure_future(monitor_results())
 
 async def monitor_results():
