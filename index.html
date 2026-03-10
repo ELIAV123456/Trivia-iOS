@@ -217,18 +217,29 @@ async def check_ans(e=None):
     idx += 1; js.setTimeout(create_proxy(next_q), 1500)
 
 async def finish():
-    global game_active; game_active = False
-    if timer_event: js.clearInterval(timer_event)
+    global game_active
+    game_active = False
+    if timer_event:
+        js.clearInterval(timer_event)
+    
     u = js.localStorage.getItem("user")
     
     if not is_pvp:
-        res = await pyfetch(f"{DB_URL}users/{u}.json"); ud = await res.json()
+        # שליחת הנתונים
+        res = await pyfetch(f"{DB_URL}users/{u}.json")
+        ud = await res.json()
         new_total = (ud.get('points', 0) if ud else 0) + score
         await pyfetch(f"{DB_URL}users/{u}.json", method="PATCH", body=json.dumps({"points": new_total}))
+        
+        # ההודעה הקופצת
         js.alert(f"המשחק נגמר! הרווחת {int(score)} נקודות.") 
-        update_menu(); switch_screen("menu-screen")
+        
+        # חזרה לתפריט
+        update_menu()
+        switch_screen("menu-screen")
     else:
-        switch_screen("result-screen"); js.document.getElementById("my-final-score").innerText = f"הציון שלך: {int(score)}"
+        switch_screen("result-screen")
+        js.document.getElementById("my-final-score").innerText = f"הציון שלך: {int(score)}"
         f = "p1_score" if i_am_p1 else "p2_score"
         await pyfetch(f"{DB_URL}rooms/{current_room_id}.json", method="PATCH", body=json.dumps({f: score}))
         asyncio.ensure_future(monitor_results())
